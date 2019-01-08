@@ -47,7 +47,8 @@ mismatchIndexSequences = []
 
 for index1 in range(len(index1Sequence)):
     for index2 in range(len(index2Sequence)):
-        mismatchIndexSequences.append(index1Sequence[index1] + "+" + index2Sequence[index2])
+        if index1 != index2:
+            mismatchIndexSequences.append(index1Sequence[index1] + "+" + index2Sequence[index2])
 
 print(mismatchIndexSequences)
 print("Number of mismatched index combinations is " + str(len(mismatchIndexSequences)))
@@ -83,4 +84,5 @@ for lane in range(numOfLanes):
 
 indexHopPercent = (totalNumberOfMismatchedReads / totalNumberOfReads) * 100
 
+print("The total number of identified reads is " + str(totalNumberOfReads))
 print("Index Hopping Percent is " + str(round(indexHopPercent, 2)) + "%")
