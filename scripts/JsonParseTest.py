@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import json
 
 jsonFile = open("/Users/m006703/IndexHopMetric//files/Stats.json", 'r')
