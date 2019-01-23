@@ -138,6 +138,6 @@ def import_file(jsonFile):
 
 
 if __name__ == "__main__":
-    jsonFile = open("/Users/m006703/IndexHopMetric/files/BHC53KDSXX_Stats.json", 'r')
+    jsonFile = open("/Users/m006703/IndexHopMetric/files/LSNCP_H3N53DRXX_Stats.json", 'r')
     indexHopPercent, misMatchIndexDict, indexJumpDict, indexSequence = main(jsonFile)
     jsonFile.close()
