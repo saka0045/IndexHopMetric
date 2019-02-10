@@ -1,10 +1,34 @@
 #!/usr/bin/env python3
 
 import json
+import argparse
+import sys
+import os
 
-#jsonFile = open("/Users/m006703/IndexHopMetric/files/BHC53KDSXX_Stats.json", 'r')
 
-def main(jsonFile):
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        '-i', '--inputFile', dest='inputFile', required=True,
+        help='Path to input json file'
+    )
+    parser.add_argument(
+        '-o', '--outPath', dest='outPath', required=True,
+        help='Output path for result file'
+    )
+
+    args = parser.parse_args()
+
+    inputFile = os.path.abspath(args.inputFile)
+    outPath = os.path.abspath(args.outPath)
+
+    # Add / at the end if it is not included in the output path
+    if outPath.endswith("/"):
+        outPath = outPath
+    else:
+        outPath = outPath + "/"
+
+    jsonFile = open(inputFile, 'r')
 
     # Convert the json file to a python dictionary
 
@@ -101,8 +125,7 @@ def main(jsonFile):
 
     # Make result file
 
-    resultFileDir = "/Users/m006703/IndexHopMetric/files/"
-    resultFile = open(resultFileDir + flowCellId + "_Results.txt", 'w')
+    resultFile = open(outPath + flowCellId + "_Results.txt", 'w')
 
     resultFile.write("Number of mismatched reads\t" + str(totalNumberOfMismatchedReads) + "\n")
     resultFile.write("Number of identified reads\t" + str(totalNumberOfReads) + "\n")
@@ -113,6 +136,7 @@ def main(jsonFile):
         sampleListIndex = indexSequence.index(key)
         resultFile.write(sampleList[sampleListIndex] + "\t" + key + "\t" + str(val) + "\n")
 
+    jsonFile.close()
     resultFile.close()
 
     return indexHopPercent, misMatchIndexDict, indexJumpDict, indexSequence
@@ -138,6 +162,7 @@ def import_file(jsonFile):
 
 
 if __name__ == "__main__":
-    jsonFile = open("/Users/m006703/IndexHopMetric/files/LSNCP_H3N53DRXX_Stats.json", 'r')
-    indexHopPercent, misMatchIndexDict, indexJumpDict, indexSequence = main(jsonFile)
-    jsonFile.close()
+    #jsonFile = open("/Users/m006703/IndexHopMetric/files/HH7VKDSXX_Stats.json", 'r')
+    #indexHopPercent, misMatchIndexDict, indexJumpDict, indexSequence = main(jsonFile)
+    #jsonFile.close()
+    main()
