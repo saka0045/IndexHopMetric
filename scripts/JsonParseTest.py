@@ -162,7 +162,4 @@ def import_file(jsonFile):
 
 
 if __name__ == "__main__":
-    #jsonFile = open("/Users/m006703/IndexHopMetric/files/HH7VKDSXX_Stats.json", 'r')
-    #indexHopPercent, misMatchIndexDict, indexJumpDict, indexSequence = main(jsonFile)
-    #jsonFile.close()
     main()
