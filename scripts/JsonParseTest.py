@@ -56,46 +56,6 @@ def main():
     print(index1Sequence)
     print(index2Sequence)
 
-    '''
-    # Categorize the unknown barcodes into similar sequence (within 1 base) or not similar
-
-    similar_index1 = []
-    not_similar_index1 = []
-    similar_index2 = []
-    not_similar_index2 = []
-
-    
-    for lane in range(numOfLanes):
-        for barcode in unknownBarcodes[lane]["Barcodes"]:
-            split_barcode = barcode.split("+")
-            unknown_index1 = split_barcode[0]
-            unknown_index2 = split_barcode[1]
-            for index1 in index1Sequence:
-                similarity_score = compare_sequences(index1, unknown_index1)
-                if similarity_score == 1:
-                    if unknown_index1 not in similar_index1:
-                        similar_index1.append(unknown_index1)
-                elif similarity_score > 1:
-                    if unknown_index1 not in not_similar_index1:
-                        not_similar_index1.append(unknown_index1)
-            for index2 in index2Sequence:
-                similarity_score = compare_sequences(index2, unknown_index2)
-                if similarity_score == 1:
-                    if unknown_index2 not in similar_index2:
-                        similar_index2.append(unknown_index2)
-                elif similarity_score > 1:
-                    if unknown_index2 not in not_similar_index2:
-                        not_similar_index2.append(unknown_index2)
-    print("Similar index1:")
-    print(similar_index1)
-    print("Not similar index 1:")
-    print(not_similar_index1)
-    print("Similar index2:")
-    print(similar_index2)
-    print("Not similar index2:")
-    print(not_similar_index2)
-    '''
-
     # Make all possible index1-index2 combinations
 
     mismatchIndexSequences = []
@@ -145,21 +105,23 @@ def main():
                     similarity_score1 = compare_sequences(index1, unknown_index1)
                     if similarity_score1 <= 1: # If index 1 is similar or same
                         for index2 in index2Sequence:
-                            similarity_score2 = compare_sequences(index2, unknown_index2)
-                            if similarity_score2 <= 1: # If index 1 and index 2 are similar or the same
-                                '''
-                                Note: This will not double count the exact same index1-index2 sequence in the
-                                mismatchIndexSequences list because of the if statement above
-                                '''
-                                if barcode not in similar_mismatch_index_dict:
-                                    similar_mismatch_index_dict[barcode] = number_of_mismatched_reads
-                                else:
-                                    similar_mismatch_index_dict[barcode] += number_of_mismatched_reads
-                            else: # If index 1 is same/similar and index 2 isn't
-                                if barcode not in not_similar_mismatch_index_dict:
-                                    not_similar_mismatch_index_dict[barcode] = number_of_mismatched_reads
-                                else:
-                                    not_similar_mismatch_index_dict[barcode] += number_of_mismatched_reads
+                            # Avoid counting a valid index1-index2 combination that is off by 1 base
+                            if (index1Sequence.index(index1) != index2Sequence.index(index2)):
+                                similarity_score2 = compare_sequences(index2, unknown_index2)
+                                if similarity_score2 <= 1: # If index 1 and index 2 are similar or the same
+                                    '''
+                                    Note: This will not double count the exact same index1-index2 sequence in the
+                                    mismatchIndexSequences list because of the if statement above
+                                    '''
+                                    if barcode not in similar_mismatch_index_dict:
+                                        similar_mismatch_index_dict[barcode] = number_of_mismatched_reads
+                                    else:
+                                        similar_mismatch_index_dict[barcode] += number_of_mismatched_reads
+                                else: # If index 1 is same/similar and index 2 isn't
+                                    if barcode not in not_similar_mismatch_index_dict:
+                                        not_similar_mismatch_index_dict[barcode] = number_of_mismatched_reads
+                                    else:
+                                        not_similar_mismatch_index_dict[barcode] += number_of_mismatched_reads
                     else: #If index 1 is not similar
                         for index2 in index2Sequence:
                             similarity_score2 = compare_sequences(index2, unknown_index2)
@@ -170,31 +132,6 @@ def main():
                                     not_similar_mismatch_index_dict[barcode] += number_of_mismatched_reads
                             else: # If index 1 and index 2 are both not similar, we don't care about this barcode
                                 continue
-
-
-    '''
-    # Calculate the total number of mismatched barcodes and store the result in a dictionary
-
-    totalNumberOfMismatchedReads = 0
-    mismatch_index_dict = {}
-
-    for lane in range(numOfLanes):
-        for index in range(len(mismatchIndexSequences)):
-            mismatchIndex = mismatchIndexSequences[index]
-            if mismatchIndex in unknownBarcodes[lane]["Barcodes"]:
-                numberOfMismatchedReads = int(unknownBarcodes[lane]["Barcodes"][mismatchIndex])
-                if mismatchIndex not in mismatch_index_dict:
-                    mismatch_index_dict[mismatchIndex] = numberOfMismatchedReads
-                else:
-                    mismatch_index_dict[mismatchIndex] += numberOfMismatchedReads
-                #print("The mismatch index " + mismatchIndex + " was found and has a read number of " + str(numberOfMismatchedReads) + " for lane " + str(lane + 1))
-                totalNumberOfMismatchedReads += numberOfMismatchedReads
-                #print("The total number of mismatch reads is " + str(totalNumberOfMismatchedReads))
-            else:
-                mismatch_index_dict[mismatchIndex] = 0
-                print("The mismatch index " + mismatchIndex + " was not found")
-                #print("The total number of mismatch reads is " + str(totalNumberOfMismatchedReads))
-    '''
 
     # Calculate the index hopping percent
 
@@ -223,7 +160,6 @@ def main():
         index2 = index2Sequence[index]
         for keys in mismatch_index_dict.keys():
             if (index1Sequence[index] in keys) or (index2Sequence[index] in keys):
-                #print(index1Sequence[index] + " or " + index2Sequence[index] + " found in " + keys + " with a counter of" + str(mismatch_index_dict[keys]))
                 indexJumpCounter += mismatch_index_dict[keys]
         for keys in similar_mismatch_index_dict.keys():
             sequence1 = keys.split("+")[0]
@@ -234,6 +170,7 @@ def main():
                 indexJumpCounter += similar_mismatch_index_dict[keys]
             elif similarity_score2 <= 1:
                 indexJumpCounter += similar_mismatch_index_dict[keys]
+        '''
         for keys in not_similar_mismatch_index_dict.keys():
             sequence1 = keys.split("+")[0]
             sequence2 = keys.split("+")[1]
@@ -243,8 +180,8 @@ def main():
                 indexJumpCounter += not_similar_mismatch_index_dict[keys]
             elif similarity_score2 <= 1:
                 indexJumpCounter += not_similar_mismatch_index_dict[keys]
+        '''
         indexJumpDict[indexSequence[index]] = indexJumpCounter
-        #print("Total number of index " + indexSequence[index] + " jumped is " + str(indexJumpCounter))
 
     # Make result file
 
