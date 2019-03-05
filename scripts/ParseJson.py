@@ -144,8 +144,10 @@ def main():
 
     print("Similar mismatched Index Dict")
     print(similar_mismatch_index_dict)
+    '''
     print("Not similar mismatched index dict")
     print(not_similar_mismatch_index_dict)
+    '''
     print("The total number of mismatched reads is " + str(totalNumberOfMismatchedReads))
     print("The total number of identified reads is " + str(totalNumberOfReads))
     print("Index Hopping Percent is " + str(round(indexHopPercent, 2)) + "%")
