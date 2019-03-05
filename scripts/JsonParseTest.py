@@ -80,32 +80,72 @@ def main():
             totalNumberOfReads += numberOfReads
             #print("The current total number of reads is " + str(totalNumberOfReads))
 
-    # Calculate the total number of mismatched barcodes and store the result in a dictionary
+    # Calculate the mismatched reads
 
-    totalNumberOfMismatchedReads = 0
-    misMatchIndexDict = {}
+    mismatch_index_dict = {}
+    similar_mismatch_index_dict = {}
+    not_similar_mismatch_index_dict = {}
 
     for lane in range(numOfLanes):
-        for index in range(len(mismatchIndexSequences)):
-            mismatchIndex = mismatchIndexSequences[index]
-            if mismatchIndex in unknownBarcodes[lane]["Barcodes"]:
-                numberOfMismatchedReads = int(unknownBarcodes[lane]["Barcodes"][mismatchIndex])
-                if mismatchIndex not in misMatchIndexDict:
-                    misMatchIndexDict[mismatchIndex] = numberOfMismatchedReads
+        for barcode in unknownBarcodes[lane]["Barcodes"]:
+            number_of_mismatched_reads = int(unknownBarcodes[lane]["Barcodes"][barcode])
+            # If the unknown barcode is a combination of mismatched index1-index2, add it straight to the dict
+            if barcode in mismatchIndexSequences:
+                if barcode not in mismatch_index_dict:
+                    mismatch_index_dict[barcode] = number_of_mismatched_reads
                 else:
-                    misMatchIndexDict[mismatchIndex] += numberOfMismatchedReads
-                #print("The mismatch index " + mismatchIndex + " was found and has a read number of " + str(numberOfMismatchedReads) + " for lane " + str(lane + 1))
-                totalNumberOfMismatchedReads += numberOfMismatchedReads
-                #print("The total number of mismatch reads is " + str(totalNumberOfMismatchedReads))
+                    mismatch_index_dict[barcode] += number_of_mismatched_reads
+            # If not a known combinations, see if the index sequence is similar (1 base off) from the known
+            # index sequence
             else:
-                misMatchIndexDict[mismatchIndex] = 0
-                print("The mismatch index " + mismatchIndex + " was not found")
-                #print("The total number of mismatch reads is " + str(totalNumberOfMismatchedReads))
+                split_barcode = barcode.split("+")
+                unknown_index1 = split_barcode[0]
+                unknown_index2 = split_barcode[1]
+                for index1 in index1Sequence:
+                    similarity_score1 = compare_sequences(index1, unknown_index1)
+                    if similarity_score1 <= 1: # If index 1 is similar or same
+                        for index2 in index2Sequence:
+                            # Avoid counting a valid index1-index2 combination that is off by 1 base
+                            if (index1Sequence.index(index1) != index2Sequence.index(index2)):
+                                similarity_score2 = compare_sequences(index2, unknown_index2)
+                                if similarity_score2 <= 1: # If index 1 and index 2 are similar or the same
+                                    '''
+                                    Note: This will not double count the exact same index1-index2 sequence in the
+                                    mismatchIndexSequences list because of the if statement above
+                                    '''
+                                    if barcode not in similar_mismatch_index_dict:
+                                        similar_mismatch_index_dict[barcode] = number_of_mismatched_reads
+                                    else:
+                                        similar_mismatch_index_dict[barcode] += number_of_mismatched_reads
+                                else: # If index 1 is same/similar and index 2 isn't
+                                    if barcode not in not_similar_mismatch_index_dict:
+                                        not_similar_mismatch_index_dict[barcode] = number_of_mismatched_reads
+                                    else:
+                                        not_similar_mismatch_index_dict[barcode] += number_of_mismatched_reads
+                    else: #If index 1 is not similar
+                        for index2 in index2Sequence:
+                            similarity_score2 = compare_sequences(index2, unknown_index2)
+                            if similarity_score2 <= 1: # If index 1 is not similar but index 2 is same/similar
+                                if barcode not in not_similar_mismatch_index_dict:
+                                    not_similar_mismatch_index_dict[barcode] = number_of_mismatched_reads
+                                else:
+                                    not_similar_mismatch_index_dict[barcode] += number_of_mismatched_reads
+                            else: # If index 1 and index 2 are both not similar, we don't care about this barcode
+                                continue
 
     # Calculate the index hopping percent
 
+    sum_of_mismatched_index_reads = sum(mismatch_index_dict.values())
+    sum_of_similar_mismatched_index_reads = sum(similar_mismatch_index_dict.values())
+
+    totalNumberOfMismatchedReads = sum_of_mismatched_index_reads + sum_of_similar_mismatched_index_reads
+
     indexHopPercent = (totalNumberOfMismatchedReads / totalNumberOfReads) * 100
 
+    print("Similar mismatched Index Dict")
+    print(similar_mismatch_index_dict)
+    print("Not similar mismatched index dict")
+    print(not_similar_mismatch_index_dict)
     print("The total number of mismatched reads is " + str(totalNumberOfMismatchedReads))
     print("The total number of identified reads is " + str(totalNumberOfReads))
     print("Index Hopping Percent is " + str(round(indexHopPercent, 2)) + "%")
@@ -116,12 +156,32 @@ def main():
 
     for index in range(len(indexSequence)):
         indexJumpCounter = 0
-        for keys in misMatchIndexDict.keys():
+        index1 = index1Sequence[index]
+        index2 = index2Sequence[index]
+        for keys in mismatch_index_dict.keys():
             if (index1Sequence[index] in keys) or (index2Sequence[index] in keys):
-                #print(index1Sequence[index] + " or " + index2Sequence[index] + " found in " + keys + " with a counter of" + str(misMatchIndexDict[keys]))
-                indexJumpCounter += misMatchIndexDict[keys]
+                indexJumpCounter += mismatch_index_dict[keys]
+        for keys in similar_mismatch_index_dict.keys():
+            sequence1 = keys.split("+")[0]
+            sequence2 = keys.split("+")[1]
+            similarity_score1 = compare_sequences(index1, sequence1)
+            similarity_score2 = compare_sequences(index2, sequence2)
+            if similarity_score1 <= 1:
+                indexJumpCounter += similar_mismatch_index_dict[keys]
+            elif similarity_score2 <= 1:
+                indexJumpCounter += similar_mismatch_index_dict[keys]
+        '''
+        for keys in not_similar_mismatch_index_dict.keys():
+            sequence1 = keys.split("+")[0]
+            sequence2 = keys.split("+")[1]
+            similarity_score1 = compare_sequences(index1, sequence1)
+            similarity_score2 = compare_sequences(index2, sequence2)
+            if similarity_score1 <= 1:
+                indexJumpCounter += not_similar_mismatch_index_dict[keys]
+            elif similarity_score2 <= 1:
+                indexJumpCounter += not_similar_mismatch_index_dict[keys]
+        '''
         indexJumpDict[indexSequence[index]] = indexJumpCounter
-        #print("Total number of index " + indexSequence[index] + " jumped is " + str(indexJumpCounter))
 
     # Make result file
 
@@ -139,7 +199,7 @@ def main():
     jsonFile.close()
     resultFile.close()
 
-    return indexHopPercent, misMatchIndexDict, indexJumpDict, indexSequence
+    return indexHopPercent, mismatch_index_dict, indexJumpDict, indexSequence
 
 def import_file(jsonFile):
     openJson = json.load(jsonFile)
@@ -159,6 +219,18 @@ def import_file(jsonFile):
     numOfSamples = len(conversionResults[0]["DemuxResults"])
     print("Number of samples on this flowcell is " + str(numOfSamples))
     return flowCellId, conversionResults, numOfLanes, numOfSamples, unknownBarcodes, sampleList
+
+# Function to compare the similarity between two sequences
+def compare_sequences(sequence1, sequence2):
+    if (len(sequence1) == len(sequence2)):
+        similarity_score = 0
+        for nucleotide in range(len(sequence1)):
+            if sequence1[nucleotide] != sequence2[nucleotide]:
+                similarity_score += 1
+        return similarity_score
+    else:
+        print(sequence1 + " and " + sequence2 + " must be the same length.")
+        return
 
 
 if __name__ == "__main__":
