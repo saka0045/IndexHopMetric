@@ -33,114 +33,39 @@ def main():
     # Convert the json file to a python dictionary
 
     flowCellId, conversionResults, numOfLanes, numOfSamples, unknownBarcodes, sampleList = import_file(jsonFile)
+    print(flowCellId)
+    print(sampleList)
+    print("Number of lanes on this flowcell is " + str(numOfLanes))
+    print("Number of samples on this flowcell is " + str(numOfSamples))
 
     # Capture all of the samples index sequence
 
-    indexSequence = []
-
-    for sample in range(len(conversionResults[0]["DemuxResults"])):
-        indexSequence.append(conversionResults[0]["DemuxResults"][sample]["IndexMetrics"][0]["IndexSequence"])
-
+    indexSequence = capture_index_sequence(conversionResults)
     print(indexSequence)
 
-    # Separate out the index 1 and index 2
+    # Separate out the index 1 and index 2 and make all possible index1+index2 combinations
 
-    index1Sequence = []
-    index2Sequence = []
-
-    for index in range(len(indexSequence)):
-        splitIndex = indexSequence[index].split("+")
-        index1Sequence.append(splitIndex[0])
-        index2Sequence.append(splitIndex[1])
-
+    index1Sequence, index2Sequence, mismatchIndexSequences = make_all_possible_index_combinations(indexSequence)
     print(index1Sequence)
     print(index2Sequence)
-
-    # Make all possible index1-index2 combinations
-
-    mismatchIndexSequences = []
-
-    for index1 in range(len(index1Sequence)):
-        for index2 in range(len(index2Sequence)):
-            if index1 != index2:
-                mismatchIndexSequences.append(index1Sequence[index1] + "+" + index2Sequence[index2])
-
     print(mismatchIndexSequences)
     print("Number of mismatched index combinations is " + str(len(mismatchIndexSequences)))
 
     # Calculate the total number of reads for all samples
 
-    totalNumberOfReads = 0
+    totalNumberOfReads = total_number_of_reads(conversionResults, numOfLanes, numOfSamples)
 
-    for lane in range(numOfLanes):
-        for sample in range(numOfSamples):
-            numberOfReads = int(conversionResults[lane]["DemuxResults"][sample]["NumberReads"])
-            sampleId = conversionResults[lane]["DemuxResults"][sample]["SampleId"]
-            #print("For sample " + sampleId + "in lane " + str(lane + 1) + " the number of reads is " + str(numberOfReads))
-            totalNumberOfReads += numberOfReads
-            #print("The current total number of reads is " + str(totalNumberOfReads))
+    # Make dictionaries of mismatched reads
 
-    # Calculate the mismatched reads
-
-    mismatch_index_dict = {}
-    similar_mismatch_index_dict = {}
-    not_similar_mismatch_index_dict = {}
-
-    for lane in range(numOfLanes):
-        for barcode in unknownBarcodes[lane]["Barcodes"]:
-            number_of_mismatched_reads = int(unknownBarcodes[lane]["Barcodes"][barcode])
-            # If the unknown barcode is a combination of mismatched index1-index2, add it straight to the dict
-            if barcode in mismatchIndexSequences:
-                if barcode not in mismatch_index_dict:
-                    mismatch_index_dict[barcode] = number_of_mismatched_reads
-                else:
-                    mismatch_index_dict[barcode] += number_of_mismatched_reads
-            # If not a known combinations, see if the index sequence is similar (1 base off) from the known
-            # index sequence
-            else:
-                split_barcode = barcode.split("+")
-                unknown_index1 = split_barcode[0]
-                unknown_index2 = split_barcode[1]
-                for index1 in index1Sequence:
-                    similarity_score1 = compare_sequences(index1, unknown_index1)
-                    if similarity_score1 <= 1: # If index 1 is similar or same
-                        for index2 in index2Sequence:
-                            # Avoid counting a valid index1-index2 combination that is off by 1 base
-                            if (index1Sequence.index(index1) != index2Sequence.index(index2)):
-                                similarity_score2 = compare_sequences(index2, unknown_index2)
-                                if similarity_score2 <= 1: # If index 1 and index 2 are similar or the same
-                                    '''
-                                    Note: This will not double count the exact same index1-index2 sequence in the
-                                    mismatchIndexSequences list because of the if statement above
-                                    '''
-                                    if barcode not in similar_mismatch_index_dict:
-                                        similar_mismatch_index_dict[barcode] = number_of_mismatched_reads
-                                    else:
-                                        similar_mismatch_index_dict[barcode] += number_of_mismatched_reads
-                                else: # If index 1 is same/similar and index 2 isn't
-                                    if barcode not in not_similar_mismatch_index_dict:
-                                        not_similar_mismatch_index_dict[barcode] = number_of_mismatched_reads
-                                    else:
-                                        not_similar_mismatch_index_dict[barcode] += number_of_mismatched_reads
-                    else: #If index 1 is not similar
-                        for index2 in index2Sequence:
-                            similarity_score2 = compare_sequences(index2, unknown_index2)
-                            if similarity_score2 <= 1: # If index 1 is not similar but index 2 is same/similar
-                                if barcode not in not_similar_mismatch_index_dict:
-                                    not_similar_mismatch_index_dict[barcode] = number_of_mismatched_reads
-                                else:
-                                    not_similar_mismatch_index_dict[barcode] += number_of_mismatched_reads
-                            else: # If index 1 and index 2 are both not similar, we don't care about this barcode
-                                continue
+    mismatch_index_dict, similar_mismatch_index_dict = mismatched_reads(index1Sequence, index2Sequence,
+                                                                        mismatchIndexSequences, numOfLanes,
+                                                                        unknownBarcodes)
 
     # Calculate the index hopping percent
 
-    sum_of_mismatched_index_reads = sum(mismatch_index_dict.values())
-    sum_of_similar_mismatched_index_reads = sum(similar_mismatch_index_dict.values())
-
-    totalNumberOfMismatchedReads = sum_of_mismatched_index_reads + sum_of_similar_mismatched_index_reads
-
-    indexHopPercent = (totalNumberOfMismatchedReads / totalNumberOfReads) * 100
+    indexHopPercent, totalNumberOfMismatchedReads = index_hopping_percent(mismatch_index_dict,
+                                                                          similar_mismatch_index_dict,
+                                                                          totalNumberOfReads)
 
     print("Similar mismatched Index Dict")
     print(similar_mismatch_index_dict)
@@ -154,8 +79,38 @@ def main():
 
     # Calculate how many times each index pair jumped and store it in a dictionary
 
-    indexJumpDict = {}
+    indexJumpDict = index_jump_count(index1Sequence, index2Sequence, indexSequence, mismatch_index_dict,
+                                     similar_mismatch_index_dict)
 
+    # Make result file
+
+    resultFile = open(outPath + flowCellId + "_Results.txt", 'w')
+
+    resultFile.write("Number of mismatched reads\t" + str(totalNumberOfMismatchedReads) + "\n")
+    resultFile.write("Number of identified reads\t" + str(totalNumberOfReads) + "\n")
+    resultFile.write("Index Hopping Percent\t" + str(indexHopPercent) + "%\n\n")
+    resultFile.write("Sample\tIndex\tIndex Jump Count\n")
+
+    for (key, val) in indexJumpDict.items():
+        sampleListIndex = indexSequence.index(key)
+        resultFile.write(sampleList[sampleListIndex] + "\t" + key + "\t" + str(val) + "\n")
+
+    jsonFile.close()
+    resultFile.close()
+
+
+def index_jump_count(index1Sequence, index2Sequence, indexSequence, mismatch_index_dict, similar_mismatch_index_dict):
+    """
+    Uses the 3 mismatch index dictionaries to calculate the index jump count, number of how many times a valid
+    index1+index2 jumped to a different index1 or index2
+    :param index1Sequence:
+    :param index2Sequence:
+    :param indexSequence:
+    :param mismatch_index_dict:
+    :param similar_mismatch_index_dict:
+    :return Dictionary of the valid index1+index2 combination with the index jump count as values:
+    """
+    indexJumpDict = {}
     for index in range(len(indexSequence)):
         indexJumpCounter = 0
         index1 = index1Sequence[index]
@@ -184,46 +139,174 @@ def main():
                 indexJumpCounter += not_similar_mismatch_index_dict[keys]
         '''
         indexJumpDict[indexSequence[index]] = indexJumpCounter
+    return indexJumpDict
 
-    # Make result file
 
-    resultFile = open(outPath + flowCellId + "_Results.txt", 'w')
+def index_hopping_percent(mismatch_index_dict, similar_mismatch_index_dict, totalNumberOfReads):
+    """
+    Calculates the index hopping percent by dividing the read count totals from mismatch_index_dict and
+    similar_mismatch_index_dict by the total number of reads from samples
+    :param mismatch_index_dict:
+    :param similar_mismatch_index_dict:
+    :param totalNumberOfReads:
+    :return index hopping percent:
+    """
+    sum_of_mismatched_index_reads = sum(mismatch_index_dict.values())
+    sum_of_similar_mismatched_index_reads = sum(similar_mismatch_index_dict.values())
+    totalNumberOfMismatchedReads = sum_of_mismatched_index_reads + sum_of_similar_mismatched_index_reads
+    indexHopPercent = (totalNumberOfMismatchedReads / totalNumberOfReads) * 100
+    return indexHopPercent, totalNumberOfMismatchedReads
 
-    resultFile.write("Number of mismatched reads\t" + str(totalNumberOfMismatchedReads) + "\n")
-    resultFile.write("Number of identified reads\t" + str(totalNumberOfReads) + "\n")
-    resultFile.write("Index Hopping Percent\t" + str(indexHopPercent) + "%\n\n")
-    resultFile.write("Sample\tIndex\tIndex Jump Count\n")
 
-    for (key, val) in indexJumpDict.items():
-        sampleListIndex = indexSequence.index(key)
-        resultFile.write(sampleList[sampleListIndex] + "\t" + key + "\t" + str(val) + "\n")
+def mismatched_reads(index1Sequence, index2Sequence, mismatchIndexSequences, numOfLanes, unknownBarcodes):
+    """
+    Takes the index 1 and index 2 sequences to make three dictionaries with read counts
+    mismatch_index_dict is a dictionary of the invalid index1+index2 combinations
+    similar_mismatch_index_dict is a dictionary of invalid index1+index2 combinations that are off by
+    one sequencei that is found in the Barcodes section of the json file
+    not_similar_mismatch_index_dict has either the index1 or index2 sequence on one end and a completely unknown
+    sequence on the other end in the json file, it will also look for index that are one base off of index1 or index2
+    :param index1Sequence:
+    :param index2Sequence:
+    :param mismatchIndexSequences:
+    :param numOfLanes:
+    :param unknownBarcodes:
+    :return Currently only returns the mismatch_index_dict and similar_mismatch_index_dict
+            the not_similar_mismatch_index_dict doesn't have a use at this point:
+    """
+    mismatch_index_dict = {}
+    similar_mismatch_index_dict = {}
+    not_similar_mismatch_index_dict = {}
+    for lane in range(numOfLanes):
+        for barcode in unknownBarcodes[lane]["Barcodes"]:
+            number_of_mismatched_reads = int(unknownBarcodes[lane]["Barcodes"][barcode])
+            # If the unknown barcode is a combination of mismatched index1-index2, add it straight to the dict
+            if barcode in mismatchIndexSequences:
+                if barcode not in mismatch_index_dict:
+                    mismatch_index_dict[barcode] = number_of_mismatched_reads
+                else:
+                    mismatch_index_dict[barcode] += number_of_mismatched_reads
+            # If not a known combinations, see if the index sequence is similar (1 base off) from the known
+            # index sequence
+            else:
+                split_barcode = barcode.split("+")
+                unknown_index1 = split_barcode[0]
+                unknown_index2 = split_barcode[1]
+                for index1 in index1Sequence:
+                    similarity_score1 = compare_sequences(index1, unknown_index1)
+                    if similarity_score1 <= 1:  # If index 1 is similar or same
+                        for index2 in index2Sequence:
+                            # Avoid counting a valid index1-index2 combination that is off by 1 base
+                            if (index1Sequence.index(index1) != index2Sequence.index(index2)):
+                                similarity_score2 = compare_sequences(index2, unknown_index2)
+                                if similarity_score2 <= 1:  # If index 1 and index 2 are similar or the same
+                                    '''
+                                    Note: This will not double count the exact same index1-index2 sequence in the
+                                    mismatchIndexSequences list because of the if statement above
+                                    '''
+                                    if barcode not in similar_mismatch_index_dict:
+                                        similar_mismatch_index_dict[barcode] = number_of_mismatched_reads
+                                    else:
+                                        similar_mismatch_index_dict[barcode] += number_of_mismatched_reads
+                                else:  # If index 1 is same/similar and index 2 isn't
+                                    if barcode not in not_similar_mismatch_index_dict:
+                                        not_similar_mismatch_index_dict[barcode] = number_of_mismatched_reads
+                                    else:
+                                        not_similar_mismatch_index_dict[barcode] += number_of_mismatched_reads
+                    else:  # If index 1 is not similar
+                        for index2 in index2Sequence:
+                            similarity_score2 = compare_sequences(index2, unknown_index2)
+                            if similarity_score2 <= 1:  # If index 1 is not similar but index 2 is same/similar
+                                if barcode not in not_similar_mismatch_index_dict:
+                                    not_similar_mismatch_index_dict[barcode] = number_of_mismatched_reads
+                                else:
+                                    not_similar_mismatch_index_dict[barcode] += number_of_mismatched_reads
+                            else:  # If index 1 and index 2 are both not similar, we don't care about this barcode
+                                continue
+    return mismatch_index_dict, similar_mismatch_index_dict
 
-    jsonFile.close()
-    resultFile.close()
 
-    return indexHopPercent, mismatch_index_dict, indexJumpDict, indexSequence
+def total_number_of_reads(conversionResults, numOfLanes, numOfSamples):
+    """
+    Calculates the total number of reads assigned to samples
+    :param conversionResults:
+    :param numOfLanes:
+    :param numOfSamples:
+    :return total number of reads assigned to samples:
+    """
+    totalNumberOfReads = 0
+    for lane in range(numOfLanes):
+        for sample in range(numOfSamples):
+            numberOfReads = int(conversionResults[lane]["DemuxResults"][sample]["NumberReads"])
+            totalNumberOfReads += numberOfReads
+    return totalNumberOfReads
+
+
+def make_all_possible_index_combinations(indexSequence):
+    """
+    Separates out the indexes in indexSequence to index1 and index2
+    and makes all possible index1+index2 combinations
+    Assumes the indexes in indexSequence is dual indexed
+    :param indexSequence:
+    :return index1Sequence, index2Sequence, mismatchIndexSequences:
+    """
+    index1Sequence = []
+    index2Sequence = []
+    for index in range(len(indexSequence)):
+        splitIndex = indexSequence[index].split("+")
+        index1Sequence.append(splitIndex[0])
+        index2Sequence.append(splitIndex[1])
+    # Make all possible index1-index2 combinations
+    mismatchIndexSequences = []
+    for index1 in range(len(index1Sequence)):
+        for index2 in range(len(index2Sequence)):
+            if index1 != index2:
+                mismatchIndexSequences.append(index1Sequence[index1] + "+" + index2Sequence[index2])
+    return index1Sequence, index2Sequence, mismatchIndexSequences
+
+
+def capture_index_sequence(conversionResults):
+    """
+    Capture the index sequences used on samples in a Stats.json file
+    :param conversionResults:
+    :return indexSequence:
+    """
+    indexSequence = []
+    for sample in range(len(conversionResults[0]["DemuxResults"])):
+        indexSequence.append(conversionResults[0]["DemuxResults"][sample]["IndexMetrics"][0]["IndexSequence"])
+    return indexSequence
+
 
 def import_file(jsonFile):
+    """
+    Import the Stats.json file and convert it to a dictionary
+    :param jsonFile:
+    :return flowcell ID, number of lanes used, list of sample names, number of samples,
+    path to ConversionResults and UnknownBarcodes:
+    """
     openJson = json.load(jsonFile)
     flowCellId = openJson["Flowcell"]
-    print(flowCellId)
     conversionResults = openJson["ConversionResults"]
     unknownBarcodes = openJson["UnknownBarcodes"]
     # Calculate the number of lanes on the flowcell
     numOfLanes = len(conversionResults)
-    print("Number of lanes on this flowcell is " + str(numOfLanes))
     # List of samples
     sampleList = []
     for sample in range(len(conversionResults[0]["DemuxResults"])):
         sampleList.append(conversionResults[0]["DemuxResults"][sample]["SampleId"])
-    print(sampleList)
     # Number of samples on this flowcell
     numOfSamples = len(conversionResults[0]["DemuxResults"])
-    print("Number of samples on this flowcell is " + str(numOfSamples))
     return flowCellId, conversionResults, numOfLanes, numOfSamples, unknownBarcodes, sampleList
 
-# Function to compare the similarity between two sequences
+
 def compare_sequences(sequence1, sequence2):
+    """
+    Compares the similarity between sequence 1 and sequence 2
+    The two sequences must be of the same length
+    :param sequence1:
+    :param sequence2:
+    :return similarity_score: If the two sequences are identical, the similarity score would be 0
+    """
     if (len(sequence1) == len(sequence2)):
         similarity_score = 0
         for nucleotide in range(len(sequence1)):
