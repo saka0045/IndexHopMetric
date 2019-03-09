@@ -57,7 +57,7 @@ def main():
 
     # Make dictionaries of mismatched reads
 
-    mismatch_index_dict, similar_mismatch_index_dict = mismatched_reads(index1Sequence, index2Sequence,
+    mismatch_index_dict, similar_mismatch_index_dict, not_similar_mismatch_index_dict = mismatched_reads(index1Sequence, index2Sequence,
                                                                         mismatchIndexSequences, numOfLanes,
                                                                         unknownBarcodes)
 
@@ -69,10 +69,8 @@ def main():
 
     print("Similar mismatched Index Dict")
     print(similar_mismatch_index_dict)
-    '''
     print("Not similar mismatched index dict")
     print(not_similar_mismatch_index_dict)
-    '''
     print("The total number of mismatched reads is " + str(totalNumberOfMismatchedReads))
     print("The total number of identified reads is " + str(totalNumberOfReads))
     print("Index Hopping Percent is " + str(round(indexHopPercent, 2)) + "%")
@@ -223,7 +221,7 @@ def mismatched_reads(index1Sequence, index2Sequence, mismatchIndexSequences, num
                                     not_similar_mismatch_index_dict[barcode] += number_of_mismatched_reads
                             else:  # If index 1 and index 2 are both not similar, we don't care about this barcode
                                 continue
-    return mismatch_index_dict, similar_mismatch_index_dict
+    return mismatch_index_dict, similar_mismatch_index_dict, not_similar_mismatch_index_dict
 
 
 def total_number_of_reads(conversionResults, numOfLanes, numOfSamples):
