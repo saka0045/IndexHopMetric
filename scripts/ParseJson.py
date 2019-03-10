@@ -69,8 +69,10 @@ def main():
 
     print("Similar mismatched Index Dict")
     print(similar_mismatch_index_dict)
+    '''
     print("Not similar mismatched index dict")
     print(not_similar_mismatch_index_dict)
+    '''
     print("The total number of mismatched reads is " + str(totalNumberOfMismatchedReads))
     print("The total number of identified reads is " + str(totalNumberOfReads))
     print("Index Hopping Percent is " + str(round(indexHopPercent, 2)) + "%")
@@ -79,6 +81,32 @@ def main():
 
     indexJumpDict = index_jump_count(index1Sequence, index2Sequence, indexSequence, mismatch_index_dict,
                                      similar_mismatch_index_dict)
+
+    # Group all of the not similar indexes to the valid sample index1+index2 combination
+
+    not_similar_jump_count = {}
+    not_similar_index_association = {}
+    for index in range(len(indexSequence)):
+        not_similar_indexes = {}
+        not_similar_index_jump_counter = 0
+        index1 = index1Sequence[index]
+        index2 = index2Sequence[index]
+        for keys in not_similar_mismatch_index_dict.keys():
+            sequence1 = keys.split("+")[0]
+            sequence2 = keys.split("+")[1]
+            similarity_score1 = compare_sequences(index1, sequence1)
+            similarity_score2 = compare_sequences(index2, sequence2)
+            if similarity_score1 <= 1:
+                not_similar_index_jump_counter += not_similar_mismatch_index_dict[keys]
+                not_similar_indexes[keys] = not_similar_mismatch_index_dict[keys]
+            elif similarity_score2 <= 1:
+                not_similar_index_jump_counter += not_similar_mismatch_index_dict[keys]
+                not_similar_indexes[keys] = not_similar_mismatch_index_dict[keys]
+        not_similar_index_association[indexSequence[index]] = not_similar_indexes
+        not_similar_jump_count[indexSequence[index]] = not_similar_index_jump_counter
+
+    print("Not similar index association dictionary")
+    print(not_similar_index_association)
 
     # Make result file
 
@@ -93,8 +121,21 @@ def main():
         sampleListIndex = indexSequence.index(key)
         resultFile.write(sampleList[sampleListIndex] + "\t" + key + "\t" + str(val) + "\n")
 
+    # Make non similar mismatch index result file
+
+    not_similar_mismatch_index_result_file = open(outPath + flowCellId + "_NonSimilarIndex.txt", 'w')
+
+    for (key, val) in not_similar_index_association.items():
+        sampleListIndex = indexSequence.index(key)
+        not_similar_mismatch_index_result_file.write(sampleList[sampleListIndex] + ": " + key + "\t" +
+                                                     str(not_similar_jump_count[key]) + "\n")
+        for (item, number) in val.items():
+            not_similar_mismatch_index_result_file.write(item + "\t" + str(number) + "\n")
+        not_similar_mismatch_index_result_file.write("\n")
+
     jsonFile.close()
     resultFile.close()
+    not_similar_mismatch_index_result_file.close()
 
 
 def index_jump_count(index1Sequence, index2Sequence, indexSequence, mismatch_index_dict, similar_mismatch_index_dict):
