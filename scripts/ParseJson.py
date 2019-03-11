@@ -69,10 +69,8 @@ def main():
 
     print("Similar mismatched Index Dict")
     print(similar_mismatch_index_dict)
-    '''
     print("Not similar mismatched index dict")
     print(not_similar_mismatch_index_dict)
-    '''
     print("The total number of mismatched reads is " + str(totalNumberOfMismatchedReads))
     print("The total number of identified reads is " + str(totalNumberOfReads))
     print("Index Hopping Percent is " + str(round(indexHopPercent, 2)) + "%")
@@ -124,13 +122,15 @@ def main():
     # Make non similar mismatch index result file
 
     not_similar_mismatch_index_result_file = open(outPath + flowCellId + "_NonSimilarIndex.txt", 'w')
+    not_similar_mismatch_index_result_file.write("Sample\tMismatch Index\tMismatch Read Count\t" +
+                                                 "Total Mismatch Reads for Sample\n")
 
     for (key, val) in not_similar_index_association.items():
         sampleListIndex = indexSequence.index(key)
-        not_similar_mismatch_index_result_file.write(sampleList[sampleListIndex] + ": " + key + "\t" +
-                                                     str(not_similar_jump_count[key]) + "\n")
+        not_similar_mismatch_index_result_file.write(sampleList[sampleListIndex] + ": " + key + "\t\t\t"
+                                                     + str(not_similar_jump_count[key]) + "\n")
         for (item, number) in val.items():
-            not_similar_mismatch_index_result_file.write(item + "\t" + str(number) + "\n")
+            not_similar_mismatch_index_result_file.write("\t" + item + "\t" + str(number) + "\n")
         not_similar_mismatch_index_result_file.write("\n")
 
     jsonFile.close()
@@ -231,10 +231,14 @@ def mismatched_reads(index1Sequence, index2Sequence, mismatchIndexSequences, num
                 split_barcode = barcode.split("+")
                 unknown_index1 = split_barcode[0]
                 unknown_index2 = split_barcode[1]
+                index1_loop = 0
+                index2_loop = 0
                 for index1 in index1Sequence:
+                    index1_loop += 1
                     similarity_score1 = compare_sequences(index1, unknown_index1)
                     if similarity_score1 <= 1:  # If index 1 is similar or same
                         for index2 in index2Sequence:
+                            index2_loop += 1
                             # Avoid counting a valid index1-index2 combination that is off by 1 base
                             if (index1Sequence.index(index1) != index2Sequence.index(index2)):
                                 similarity_score2 = compare_sequences(index2, unknown_index2)
@@ -247,12 +251,14 @@ def mismatched_reads(index1Sequence, index2Sequence, mismatchIndexSequences, num
                                         similar_mismatch_index_dict[barcode] = number_of_mismatched_reads
                                     else:
                                         similar_mismatch_index_dict[barcode] += number_of_mismatched_reads
-                                else:  # If index 1 is same/similar and index 2 isn't
+                                elif index2_loop == len(index2Sequence):  # If index 1 is same/similar and index 2 isn't
+                                    # Loop through all the index 2s first before adding the number with no match
                                     if barcode not in not_similar_mismatch_index_dict:
                                         not_similar_mismatch_index_dict[barcode] = number_of_mismatched_reads
                                     else:
                                         not_similar_mismatch_index_dict[barcode] += number_of_mismatched_reads
-                    else:  # If index 1 is not similar
+                    elif index1_loop == len(index1Sequence):  # If index 1 is not similar
+                        # Loop through all the index 1 first before adding the read counts
                         for index2 in index2Sequence:
                             similarity_score2 = compare_sequences(index2, unknown_index2)
                             if similarity_score2 <= 1:  # If index 1 is not similar but index 2 is same/similar
