@@ -57,9 +57,9 @@ def main():
 
     # Make dictionaries of mismatched reads
 
-    mismatch_index_dict, similar_mismatch_index_dict, not_similar_mismatch_index_dict = mismatched_reads(index1Sequence, index2Sequence,
-                                                                        mismatchIndexSequences, numOfLanes,
-                                                                        unknownBarcodes)
+    mismatch_index_dict, similar_mismatch_index_dict, not_similar_mismatch_index_dict = mismatched_reads(index1Sequence,
+                                                                        index2Sequence, mismatchIndexSequences,
+                                                                                    numOfLanes, unknownBarcodes)
 
     # Calculate the index hopping percent
 
