@@ -66,6 +66,7 @@ def collect_barcodes(path, filelist):
     barcode_dict = {}
 
     for file in filelist:
+        print("Processing: " + path + file)
         line_number = 0
         fastq_file = gzip.open(path + file, "rt")
 
