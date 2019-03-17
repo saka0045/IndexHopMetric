@@ -59,7 +59,12 @@ def main():
     undetermined_barcode_dict = collect_barcodes(undetermined_path, undetermined_fastq_file_list)
 
     print(sample_barcode_dict)
+    for keys in sample_barcode_dict:
+        print("Total number of barcodes found in " + keys + ": " + str(sum(sample_barcode_dict[keys].values())))
+
     print(undetermined_barcode_dict)
+    for keys in undetermined_barcode_dict:
+        print("Total number of barcodes found in " + keys + ": " + str(sum(undetermined_barcode_dict[keys].values())))
 
 
 def collect_barcodes(path, filelist):
@@ -67,6 +72,8 @@ def collect_barcodes(path, filelist):
 
     for file in filelist:
         print("Processing: " + path + file)
+        sample_name = file.split("_")[0]
+        sample_barcode_collection_dict = {}
         line_number = 0
         fastq_file = gzip.open(path + file, "rt")
 
@@ -74,13 +81,22 @@ def collect_barcodes(path, filelist):
             if line_number % 4 == 0:
                 line = line.strip("\n")
                 barcode = line.split(":")[-1]
-                if barcode not in barcode_dict:
-                    barcode_dict[barcode] = 1
+                if barcode not in sample_barcode_collection_dict:
+                    sample_barcode_collection_dict[barcode] = 1
                 else:
-                    barcode_dict[barcode] += 1
+                    sample_barcode_collection_dict[barcode] += 1
                 line_number += 1
             else:
                 line_number += 1
+
+        if sample_name in barcode_dict:
+            for (key, val) in sample_barcode_collection_dict.items():
+                if key in barcode_dict[sample_name].keys():
+                    barcode_dict[sample_name][key] += val
+                else:
+                    barcode_dict[sample_name][key] = val
+        else:
+            barcode_dict[sample_name] = sample_barcode_collection_dict
 
     return barcode_dict
 
