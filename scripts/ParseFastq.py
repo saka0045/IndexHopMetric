@@ -101,11 +101,11 @@ def collect_barcodes(path, file_list):
                 line_number += 1
 
         if sample_name in barcode_dict:
-            for (key, val) in sample_barcode_collection_dict.items():
-                if key in barcode_dict[sample_name].keys():
-                    barcode_dict[sample_name][key] += val
+            for (barcode, read_count) in sample_barcode_collection_dict.items():
+                if barcode in barcode_dict[sample_name].keys():
+                    barcode_dict[sample_name][barcode] += read_count
                 else:
-                    barcode_dict[sample_name][key] = val
+                    barcode_dict[sample_name][barcode] = read_count
         else:
             barcode_dict[sample_name] = sample_barcode_collection_dict
 
