@@ -16,12 +16,17 @@ def main():
         '-o', '--outPath', dest='out_path', required=True,
         help="Output path for result file"
     )
+    parser.add_argument(
+        '-s', '--sampleSheet', dest='sample_sheet_path', required=True,
+        help="Path to sample sheet"
+    )
 
     args = parser.parse_args()
 
     input_sample_path = os.path.abspath(args.input_sample_path)
     undetermined_path = os.path.abspath(args.undetermined_path)
     out_path = os.path.abspath(args.out_path)
+    sample_sheet_path = os.path.abspath(args.sample_sheet_path)
 
     # Add / at the end of input and out_path if it is not included
 
@@ -55,13 +60,75 @@ def main():
 
     undetermined_barcode_dict = collect_barcodes(undetermined_path, undetermined_fastq_file_list)
 
+    # Calculate reads per sample
+
+    sample_read_count = calculate_sample_read_count(sample_barcode_dict)
+
+    # Calculate read count for undetermined
+
+    undetermined_read_count = calculate_sample_read_count(undetermined_barcode_dict)
+
     print(sample_barcode_dict)
-    for keys in sample_barcode_dict:
-        print("Total number of barcodes found in " + keys + ": " + str(sum(sample_barcode_dict[keys].values())))
+    for sample in sample_barcode_dict:
+        print("Total number of barcodes found in " + sample + ": " + str(sample_read_count[sample]))
 
     print(undetermined_barcode_dict)
-    for keys in undetermined_barcode_dict:
-        print("Total number of barcodes found in " + keys + ": " + str(sum(undetermined_barcode_dict[keys].values())))
+    for sample in undetermined_barcode_dict:
+        print("Total number of barcodes found in " + sample + ": " + str(undetermined_read_count[sample]))
+
+    # Parse sample sheet
+
+    print("Opening sample sheet at :" + sample_sheet_path)
+
+    sample_sheet_info = parse_sample_sheet(sample_sheet_path)
+
+    print(sample_sheet_info)
+
+
+def parse_sample_sheet(sample_sheet_path):
+    """
+    Opens the supplied sample sheet and parses out information into a dictionary
+    :param sample_sheet_path:
+    :return Dictionary containing information from sample sheet:
+    """
+    sample_sheet = open(sample_sheet_path, 'r')
+    sample_sheet_info = {}
+    for line in sample_sheet:
+        # Go to the line with [Data]
+        if line.startswith("[Data]"):
+            # Skip to the header line
+            line = sample_sheet.readline()
+            line = line.rstrip()
+            header_list = line.split(",")
+            for line in sample_sheet:
+                sample_info = {}
+                line = line.rstrip()
+                line_item_list = line.split(",")
+                sample_id = line_item_list[header_list.index("SAMPLE_ID")]
+                index1 = line_item_list[header_list.index("INDEX")]
+                index2 = line_item_list[header_list.index("INDEX2")]
+                combined_index = index1 + "+" + index2
+                sample_info["Index"] = combined_index
+                if sample_id not in sample_sheet_info.keys():
+                    sample_sheet_info[sample_id] = sample_info
+            break
+    sample_sheet.close()
+
+    return sample_sheet_info
+
+
+def calculate_sample_read_count(sample_barcode_dict):
+    """
+    Calculates the read count per sample in the respective barcode dictionary with read counts
+    :param sample_barcode_dict:
+    :return Dictionary of read counts per sample:
+    """
+    sample_read_count = {}
+    for sample in sample_barcode_dict.keys():
+        read_count = sum(sample_barcode_dict[sample].values())
+        sample_read_count[sample] = read_count
+
+    return sample_read_count
 
 
 def collect_barcodes(path, file_list):
