@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-
+import itertools
 import json
 import argparse
 import sys
@@ -67,6 +67,8 @@ def main():
                                                                           similar_mismatch_index_dict,
                                                                           totalNumberOfReads)
 
+    print("Mismatch Index Dict")
+    print(mismatch_index_dict)
     print("Similar mismatched Index Dict")
     print(similar_mismatch_index_dict)
     print("Not similar mismatched index dict")
@@ -150,12 +152,15 @@ def index_jump_count(index1Sequence, index2Sequence, indexSequence, mismatch_ind
     :return Dictionary of the valid index1+index2 combination with the index jump count as values:
     """
     indexJumpDict = {}
-    for index in range(len(indexSequence)):
+    for index_num, index in enumerate(indexSequence):
         indexJumpCounter = 0
-        index1 = index1Sequence[index]
-        index2 = index2Sequence[index]
+        try:
+            index1 = index1Sequence[index_num]
+        except IndexError:
+            raise MissingSequence1Exception
+        index2 = index2Sequence[index_num]
         for keys in mismatch_index_dict.keys():
-            if (index1Sequence[index] in keys) or (index2Sequence[index] in keys):
+            if (index1Sequence[index_num] in keys) or (index2Sequence[index_num] in keys):
                 indexJumpCounter += mismatch_index_dict[keys]
         for keys in similar_mismatch_index_dict.keys():
             sequence1 = keys.split("+")[0]
@@ -177,7 +182,7 @@ def index_jump_count(index1Sequence, index2Sequence, indexSequence, mismatch_ind
             elif similarity_score2 <= 1:
                 indexJumpCounter += not_similar_mismatch_index_dict[keys]
         '''
-        indexJumpDict[indexSequence[index]] = indexJumpCounter
+        indexJumpDict[index] = indexJumpCounter
     return indexJumpDict
 
 
@@ -239,9 +244,12 @@ def mismatched_reads(index1Sequence, index2Sequence, mismatchIndexSequences, num
                     if similarity_score1 <= 1:  # If index 1 is similar or same
                         for index2 in index2Sequence:
                             index2_loop += 1
+                            similarity_score2 = compare_sequences(index2, unknown_index2)
                             # Avoid counting a valid index1-index2 combination that is off by 1 base
-                            if (index1Sequence.index(index1) != index2Sequence.index(index2)):
-                                similarity_score2 = compare_sequences(index2, unknown_index2)
+                            if similarity_score2 <= 1 and index1Sequence.index(index1) == index2Sequence.index(index2):
+                                index1_loop = 0
+                                break
+                            elif (index1Sequence.index(index1) != index2Sequence.index(index2)):
                                 if similarity_score2 <= 1:  # If index 1 and index 2 are similar or the same
                                     '''
                                     Note: This will not double count the exact same index1-index2 sequence in the
@@ -249,14 +257,20 @@ def mismatched_reads(index1Sequence, index2Sequence, mismatchIndexSequences, num
                                     '''
                                     if barcode not in similar_mismatch_index_dict:
                                         similar_mismatch_index_dict[barcode] = number_of_mismatched_reads
+                                        index1_loop = 0
+                                        break
                                     else:
                                         similar_mismatch_index_dict[barcode] += number_of_mismatched_reads
+                                        index1_loop = 0
+                                        break
                                 elif index2_loop == len(index2Sequence):  # If index 1 is same/similar and index 2 isn't
                                     # Loop through all the index 2s first before adding the number with no match
                                     if barcode not in not_similar_mismatch_index_dict:
                                         not_similar_mismatch_index_dict[barcode] = number_of_mismatched_reads
+                                        index1_loop = 0
                                     else:
                                         not_similar_mismatch_index_dict[barcode] += number_of_mismatched_reads
+                                        index1_loop = 0
                     elif index1_loop == len(index1Sequence):  # If index 1 is not similar
                         # Loop through all the index 1 first before adding the read counts
                         for index2 in index2Sequence:
@@ -329,7 +343,7 @@ def import_file(jsonFile):
     :return flowcell ID, number of lanes used, list of sample names, number of samples,
     path to ConversionResults and UnknownBarcodes:
     """
-    openJson = json.load(jsonFile)
+    openJson = json.load(jsonFile) # move this to the main and added it to a variable to pass along the function
     flowCellId = openJson["Flowcell"]
     conversionResults = openJson["ConversionResults"]
     unknownBarcodes = openJson["UnknownBarcodes"]
@@ -365,3 +379,7 @@ def compare_sequences(sequence1, sequence2):
 
 if __name__ == "__main__":
     main()
+
+
+class MissingSequence1Exception(Exception):
+    pass
