@@ -93,16 +93,16 @@ def main():
 
     # Make result file
 
-    resultFile = open(out_path + flow_cell_id + "_Results.txt", 'w')
+    result_file = open(out_path + flow_cell_id + "_Results.txt", 'w')
 
-    resultFile.write("Number of mismatched reads\t" + str(total_number_of_mismatched_reads) + "\n")
-    resultFile.write("Number of identified reads\t" + str(total_number_of_reads) + "\n")
-    resultFile.write("Index Hopping Percent\t" + str(index_hop_percent) + "%\n\n")
-    resultFile.write("Sample\tIndex\tIndex Jump Count\n")
+    result_file.write("Number of mismatched reads\t" + str(total_number_of_mismatched_reads) + "\n")
+    result_file.write("Number of identified reads\t" + str(total_number_of_reads) + "\n")
+    result_file.write("Index Hopping Percent\t" + str(index_hop_percent) + "%\n\n")
+    result_file.write("Sample\tIndex\tIndex Jump Count\n")
 
     for (key, val) in index_jump_dict.items():
-        sampleListIndex = index_sequence.index(key)
-        resultFile.write(sample_list[sampleListIndex] + "\t" + key + "\t" + str(val) + "\n")
+        sample_list_index = index_sequence.index(key)
+        result_file.write(sample_list[sample_list_index] + "\t" + key + "\t" + str(val) + "\n")
 
     # Make non similar mismatch index result file
 
@@ -111,15 +111,15 @@ def main():
                                                  "Total Mismatch Reads for Sample\n")
 
     for (key, val) in not_similar_index_association.items():
-        sampleListIndex = index_sequence.index(key)
-        not_similar_mismatch_index_result_file.write(sample_list[sampleListIndex] + ": " + key + "\t\t\t"
+        sample_list_index = index_sequence.index(key)
+        not_similar_mismatch_index_result_file.write(sample_list[sample_list_index] + ": " + key + "\t\t\t"
                                                      + str(not_similar_jump_count_dict[key]) + "\n")
         for (item, number) in val.items():
             not_similar_mismatch_index_result_file.write("\t" + item + "\t" + str(number) + "\n")
         not_similar_mismatch_index_result_file.write("\n")
 
     json_file.close()
-    resultFile.close()
+    result_file.close()
     not_similar_mismatch_index_result_file.close()
 
 

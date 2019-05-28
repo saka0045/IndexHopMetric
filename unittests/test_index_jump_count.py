@@ -46,3 +46,4 @@ class TestIndex_jump_count(TestCase):
         with self.assertRaises(ParseJson.MissingSequence1Exception):
             index_jump_count([], self.index2_sequence, self.index_sequence, self.mismatch_index_dict, self.similar_mismatch_index_dict)
 
+
