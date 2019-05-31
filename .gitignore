@@ -3,3 +3,4 @@ bin/*
 files/*
 lib/*
 pyvenv.cfg
+biopython_test.py
