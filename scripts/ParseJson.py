@@ -16,11 +16,16 @@ def main():
         '-o', '--outPath', dest='outPath', required=True,
         help='Output path for result file'
     )
+    parser.add_argument(
+        '-s', '--sampleSheet', dest='sample_sheet', required=True,
+        help="Path to sample sheet"
+    )
 
     args = parser.parse_args()
 
     input_file = os.path.abspath(args.inputFile)
     out_path = os.path.abspath(args.outPath)
+    sample_sheet_path = os.path.abspath(args.sample_sheet)
 
     # Add / at the end if it is not included in the output path
     if out_path.endswith("/"):
@@ -30,9 +35,19 @@ def main():
 
     json_file = open(input_file, 'r')
 
+    # Gather information from Sample Sheet
+
+    sample_sheet_info = parse_sample_sheet(sample_sheet_path)
+
     # Convert the json file to a python dictionary
 
-    flow_cell_id, conversion_results, num_of_lanes, num_of_samples, unknown_barcodes, sample_list = import_file(json_file)
+    flow_cell_id, run_dir_base, conversion_results, num_of_lanes, num_of_samples, \
+    unknown_barcodes, sample_list = import_file(json_file)
+
+    # Validate the sample name from sample list to Stats.json
+
+    validate_samples(sample_list, sample_sheet_info)
+
     print(flow_cell_id)
     print(sample_list)
     print("Number of lanes on this flowcell is " + str(num_of_lanes))
@@ -48,7 +63,7 @@ def main():
     index1_sequence, index2_sequence, mismatch_index_sequences = make_all_possible_index_combinations(index_sequence)
     print(index1_sequence)
     print(index2_sequence)
-    print(mismatch_index_sequences)
+    # print(mismatch_index_sequences)
     print("Number of mismatched index combinations is " + str(len(mismatch_index_sequences)))
 
     # Calculate the total number of reads for all samples
@@ -67,12 +82,14 @@ def main():
                                                                           similar_mismatch_index_dict,
                                                                           total_number_of_reads)
 
+    '''
     print("Mismatch Index Dict")
     print(mismatch_index_dict)
     print("Similar mismatched Index Dict")
     print(similar_mismatch_index_dict)
     print("Not similar mismatched index dict")
     print(not_similar_mismatch_index_dict)
+    '''
     print("The total number of mismatched reads is " + str(total_number_of_mismatched_reads))
     print("The total number of identified reads is " + str(total_number_of_reads))
     print("Index Hopping Percent is " + str(round(index_hop_percent, 2)) + "%")
@@ -81,6 +98,7 @@ def main():
 
     index_jump_dict = index_jump_count(index1_sequence, index2_sequence, index_sequence, mismatch_index_dict,
                                      similar_mismatch_index_dict)
+    print(index_jump_dict)
 
     # Group all of the not similar indexes to the valid sample index1+index2 combination
 
@@ -88,8 +106,8 @@ def main():
                                                                                         index2_sequence, index_sequence,
                                                                                         not_similar_mismatch_index_dict)
 
-    print("Not similar index association dictionary")
-    print(not_similar_index_association)
+    # print("Not similar index association dictionary")
+    # print(not_similar_index_association)
 
     # Make result file
 
@@ -121,6 +139,18 @@ def main():
     json_file.close()
     result_file.close()
     not_similar_mismatch_index_result_file.close()
+
+
+def validate_samples(sample_list, sample_sheet_info):
+    for sample_id in sample_sheet_info:
+        if len(sample_sheet_info) != len(sample_list):
+            print("Number of samples between Sample Sheet and Stats.json does not match! "
+                  "Check to see if the right Sample Sheet was provided")
+            sys.exit()
+        if sample_id not in sample_list:
+            print(sample_id + " is not found in Stats.json! Check to see if the right Sample Sheet was provided")
+            print("Terminating Index Hopping Script")
+            sys.exit()
 
 
 def not_similar_jump_count(index1_sequence, index2_sequence, index_sequence, not_similar_mismatch_index_dict):
@@ -363,6 +393,7 @@ def import_file(jsonFile):
     """
     open_json = json.load(jsonFile) # move this to the main and added it to a variable to pass along the function
     flow_cell_id = open_json["Flowcell"]
+    run_dir_base = open_json["RunId"]
     conversion_results = open_json["ConversionResults"]
     unknown_barcodes = open_json["UnknownBarcodes"]
     # Calculate the number of lanes on the flowcell
@@ -373,7 +404,7 @@ def import_file(jsonFile):
         sample_list.append(conversion_results[0]["DemuxResults"][sample]["SampleId"])
     # Number of samples on this flowcell
     num_of_samples = len(conversion_results[0]["DemuxResults"])
-    return flow_cell_id, conversion_results, num_of_lanes, num_of_samples, unknown_barcodes, sample_list
+    return flow_cell_id, run_dir_base, conversion_results, num_of_lanes, num_of_samples, unknown_barcodes, sample_list
 
 
 def compare_sequences(sequence1, sequence2):
@@ -393,6 +424,37 @@ def compare_sequences(sequence1, sequence2):
     else:
         print(sequence1 + " and " + sequence2 + " must be the same length.")
         return
+
+
+def parse_sample_sheet(sample_sheet_path):
+    """
+    Opens the supplied sample sheet and parses out information into a dictionary
+    :param sample_sheet_path:
+    :return Dictionary containing information from sample sheet:
+    """
+    sample_sheet = open(sample_sheet_path, 'r')
+    sample_sheet_info = {}
+    for line in sample_sheet:
+        # Go to the line with [Data]
+        if line.startswith("[Data]"):
+            # Skip to the header line
+            line = sample_sheet.readline()
+            line = line.rstrip()
+            header_list = line.split(",")
+            for line in sample_sheet:
+                sample_info = {}
+                line = line.rstrip()
+                line_item_list = line.split(",")
+                sample_id = line_item_list[header_list.index("SAMPLE_ID")]
+                sample_project = line_item_list[header_list.index("SAMPLE_PROJECT")]
+                batch_id = sample_project.split("_")[1]
+                sample_info["Sample_Project"] = sample_project
+                sample_info["Batch_ID"] = batch_id
+                if sample_id not in sample_sheet_info.keys():
+                    sample_sheet_info[sample_id] = sample_info
+            break
+    sample_sheet.close()
+    return sample_sheet_info
 
 
 if __name__ == "__main__":

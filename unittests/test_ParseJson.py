@@ -1,15 +1,30 @@
 import ParseJson
 
-from ParseJson import import_file, make_all_possible_index_combinations, capture_index_sequence, \
+from ParseJson import parse_sample_sheet, import_file, make_all_possible_index_combinations, capture_index_sequence, \
     compare_sequences, calculate_total_number_of_reads, mismatched_reads, index_hopping_percent, \
     index_jump_count, not_similar_jump_count
 
 from unittest import TestCase
 
+class Test_parse_sample_sheet(TestCase):
+    def setUp(self):
+        self.test_sample_sheet_path = "/Users/m006703/IndexHopMetric/files/TestSampleSheet.csv"
+        self.expected_sample_sheet_info = {'17-ATZ02': {'Sample_Project': 'TEST-MSTR_TESTBATCH1_TESTCHEMID_TESTSEQID_TESTFLOWCELLID',
+                                                        'Batch_ID': 'TESTBATCH1'},
+                                           '18-BNHL2': {'Sample_Project': 'TEST-MSTR_TESTBATCH2_TESTCHEMID_TESTSEQID_TESTFLOWCELLID',
+                                                        'Batch_ID': 'TESTBATCH2'},
+                                           '18-BNHL9': {'Sample_Project': 'TEST-MSTR_TESTBATCH3_TESTCHEMID_TESTSEQID_TESTFLOWCELLID',
+                                                        'Batch_ID': 'TESTBATCH3'}}
+
+    def test_parse_sample_sheet_happy(self):
+        sample_sheet_info = parse_sample_sheet(self.test_sample_sheet_path)
+        self.assertEqual(self.expected_sample_sheet_info, sample_sheet_info, "failed sample_sheet_info")
+
 class Test_import_file(TestCase):
     def setUp(self):
         self.test_json_file = open("/Users/m006703/IndexHopMetric/files/Test_Stats.json", 'r')
         self.expected_flowcell_id = "TEST-FLOWCELL"
+        self.expected_run_dir_base = "TEST_RUN_DIR_BASE"
         self.expected_conversion_results = [{'LaneNumber': 1, 'TotalClustersRaw': 610406, 'TotalClustersPF': 593007, 'Yield': 2965035, 'DemuxResults':
             [{'SampleId': '17-ATZ02', 'SampleName': '17-ATZ02', 'IndexMetrics':
                 [{'IndexSequence': 'AAAA+BBBB', 'MismatchCounts': {'0': 62916, '1': 1909}}],
@@ -46,8 +61,9 @@ class Test_import_file(TestCase):
         self.expected_sample_list = ['17-ATZ02', '18-BNHL2', '18-BNHL9']
 
     def test_import_file_happy(self):
-        flowcell_id, conversion_results, num_of_lanes, num_of_samples, unknown_barcodes, sample_list = import_file(self.test_json_file)
+        flowcell_id, run_dir_base, conversion_results, num_of_lanes, num_of_samples, unknown_barcodes, sample_list = import_file(self.test_json_file)
         self.assertEqual(self.expected_flowcell_id, flowcell_id, "failed flowcell_id")
+        self.assertEqual(self.expected_run_dir_base, run_dir_base, "failed run_dir_base")
         self.assertEqual(self.expected_conversion_results, conversion_results, "failed conversion_results")
         self.assertEqual(self.expected_num_of_lanes, num_of_lanes, "failed num_of_lanes")
         self.assertEqual(self.expected_num_of_samples, num_of_samples, "failed num_of_samples")
