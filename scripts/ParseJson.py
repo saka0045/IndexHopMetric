@@ -4,6 +4,7 @@ import json
 import argparse
 import sys
 import os
+from datetime import date
 
 
 def main():
@@ -19,6 +20,10 @@ def main():
     parser.add_argument(
         '-s', '--sampleSheet', dest='sample_sheet', required=True,
         help="Path to sample sheet"
+    )
+    parser.add_argument(
+        '-r', '--report', action="store_true",
+        help="Creates .txt report if argument is present"
     )
 
     args = parser.parse_args()
@@ -98,7 +103,7 @@ def main():
 
     index_jump_dict = index_jump_count(index1_sequence, index2_sequence, index_sequence, mismatch_index_dict,
                                      similar_mismatch_index_dict)
-    print(index_jump_dict)
+    # print(index_jump_dict)
 
     # Group all of the not similar indexes to the valid sample index1+index2 combination
 
@@ -109,36 +114,57 @@ def main():
     # print("Not similar index association dictionary")
     # print(not_similar_index_association)
 
-    # Make result file
+    # Make RoQCM TSV files
 
-    result_file = open(out_path + flow_cell_id + "_Results.txt", 'w')
+    today = date.today().strftime('%Y%m%d')
 
-    result_file.write("Number of mismatched reads\t" + str(total_number_of_mismatched_reads) + "\n")
-    result_file.write("Number of identified reads\t" + str(total_number_of_reads) + "\n")
-    result_file.write("Index Hopping Percent\t" + str(index_hop_percent) + "%\n\n")
-    result_file.write("Sample\tIndex\tIndex Jump Count\n")
+    index_hopping_tsv = open(out_path + run_dir_base + "-index-hopping-" + today + ".metrictsv", 'w')
+    index_hopping_tsv.write("index_hopping\trun.index.hopping.percent\tD\t" + str(index_hop_percent) + "\t"
+                            + run_dir_base + "\trun\n")
 
+    index_jump_count_tsv = open(out_path + run_dir_base + "-index-jump-count-" + today + ".metric.tsv", 'w')
     for (key, val) in index_jump_dict.items():
         sample_list_index = index_sequence.index(key)
-        result_file.write(sample_list[sample_list_index] + "\t" + key + "\t" + str(val) + "\n")
+        sample_id = sample_list[sample_list_index]
+        batch_id = sample_sheet_info[sample_id]["Batch_ID"]
+        index_jump_count_tsv.write("index_hopping\tsample.index.jump.count\tI\t" + str(val) + "\t" + sample_id +
+                                   "\tsample\t" + batch_id + "\tbatch\t" + run_dir_base + "\trun\n")
 
-    # Make non similar mismatch index result file
+    index_hopping_tsv.close()
+    index_jump_count_tsv.close()
 
-    not_similar_mismatch_index_result_file = open(out_path + flow_cell_id + "_NonSimilarIndex.txt", 'w')
-    not_similar_mismatch_index_result_file.write("Sample\tMismatch Index\tMismatch Read Count\t" +
-                                                 "Total Mismatch Reads for Sample\n")
+    # Make result file if -r argument is present
 
-    for (key, val) in not_similar_index_association.items():
-        sample_list_index = index_sequence.index(key)
-        not_similar_mismatch_index_result_file.write(sample_list[sample_list_index] + ": " + key + "\t\t\t"
-                                                     + str(not_similar_jump_count_dict[key]) + "\n")
-        for (item, number) in val.items():
-            not_similar_mismatch_index_result_file.write("\t" + item + "\t" + str(number) + "\n")
-        not_similar_mismatch_index_result_file.write("\n")
+    if args.report:
+        result_file = open(out_path + flow_cell_id + "_Results.txt", 'w')
+
+        result_file.write("Number of mismatched reads\t" + str(total_number_of_mismatched_reads) + "\n")
+        result_file.write("Number of identified reads\t" + str(total_number_of_reads) + "\n")
+        result_file.write("Index Hopping Percent\t" + str(index_hop_percent) + "%\n\n")
+        result_file.write("Sample\tIndex\tIndex Jump Count\n")
+
+        for (key, val) in index_jump_dict.items():
+            sample_list_index = index_sequence.index(key)
+            result_file.write(sample_list[sample_list_index] + "\t" + key + "\t" + str(val) + "\n")
+
+        # Make non similar mismatch index result file
+
+        not_similar_mismatch_index_result_file = open(out_path + flow_cell_id + "_NonSimilarIndex.txt", 'w')
+        not_similar_mismatch_index_result_file.write("Sample\tMismatch Index\tMismatch Read Count\t" +
+                                                     "Total Mismatch Reads for Sample\n")
+
+        for (key, val) in not_similar_index_association.items():
+            sample_list_index = index_sequence.index(key)
+            not_similar_mismatch_index_result_file.write(sample_list[sample_list_index] + ": " + key + "\t\t\t"
+                                                         + str(not_similar_jump_count_dict[key]) + "\n")
+            for (item, number) in val.items():
+                not_similar_mismatch_index_result_file.write("\t" + item + "\t" + str(number) + "\n")
+            not_similar_mismatch_index_result_file.write("\n")
+
+        result_file.close()
+        not_similar_mismatch_index_result_file.close()
 
     json_file.close()
-    result_file.close()
-    not_similar_mismatch_index_result_file.close()
 
 
 def validate_samples(sample_list, sample_sheet_info):
