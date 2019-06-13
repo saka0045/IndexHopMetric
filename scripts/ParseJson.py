@@ -7,6 +7,18 @@ import os
 from datetime import date
 
 
+class SampleNotFoundException(Exception):
+    pass
+
+
+class MissingSequence1Exception(Exception):
+    pass
+
+
+class SampleNumberMismatchException(Exception):
+    pass
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
@@ -77,15 +89,16 @@ def main():
 
     # Make dictionaries of mismatched reads
 
-    mismatch_index_dict, similar_mismatch_index_dict, not_similar_mismatch_index_dict = mismatched_reads(index1_sequence,
-                                                                        index2_sequence, mismatch_index_sequences,
-                                                                                    num_of_lanes, unknown_barcodes)
+    mismatch_index_dict, similar_mismatch_index_dict, not_similar_mismatch_index_dict = mismatched_reads(
+        index1_sequence,
+        index2_sequence, mismatch_index_sequences,
+        num_of_lanes, unknown_barcodes)
 
     # Calculate the index hopping percent
 
     index_hop_percent, total_number_of_mismatched_reads = index_hopping_percent(mismatch_index_dict,
-                                                                          similar_mismatch_index_dict,
-                                                                          total_number_of_reads)
+                                                                                similar_mismatch_index_dict,
+                                                                                total_number_of_reads)
 
     '''
     print("Mismatch Index Dict")
@@ -102,7 +115,7 @@ def main():
     # Calculate how many times each index pair jumped and store it in a dictionary
 
     index_jump_dict = index_jump_count(index1_sequence, index2_sequence, index_sequence, mismatch_index_dict,
-                                     similar_mismatch_index_dict)
+                                       similar_mismatch_index_dict)
     # print(index_jump_dict)
 
     # Group all of the not similar indexes to the valid sample index1+index2 combination
@@ -170,13 +183,11 @@ def main():
 def validate_samples(sample_list, sample_sheet_info):
     for sample_id in sample_sheet_info:
         if len(sample_sheet_info) != len(sample_list):
-            print("Number of samples between Sample Sheet and Stats.json does not match! "
-                  "Check to see if the right Sample Sheet was provided")
-            sys.exit()
+            raise SampleNumberMismatchException("Number of samples between Sample Sheet and Stats.json does not match! "
+                                                "Check to see if the right Sample Sheet was provided")
         if sample_id not in sample_list:
-            print(sample_id + " is not found in Stats.json! Check to see if the right Sample Sheet was provided")
-            print("Terminating Index Hopping Script")
-            sys.exit()
+            raise SampleNotFoundException(sample_id + " is not found in Stats.json! Check to see if the right Sample "
+                                                      "Sheet was provided")
 
 
 def not_similar_jump_count(index1_sequence, index2_sequence, index_sequence, not_similar_mismatch_index_dict):
@@ -320,7 +331,8 @@ def mismatched_reads(index1_sequence, index2_sequence, mismatch_index_sequences,
                             index2_loop += 1
                             similarity_score2 = compare_sequences(index2, unknown_index2)
                             # Avoid counting a valid index1-index2 combination that is off by 1 base
-                            if similarity_score2 <= 1 and index1_sequence.index(index1) == index2_sequence.index(index2):
+                            if similarity_score2 <= 1 and index1_sequence.index(index1) == index2_sequence.index(
+                                    index2):
                                 index1_loop = 0
                                 break
                             elif (index1_sequence.index(index1) != index2_sequence.index(index2)):
@@ -337,7 +349,8 @@ def mismatched_reads(index1_sequence, index2_sequence, mismatch_index_sequences,
                                         similar_mismatch_index_dict[barcode] += number_of_mismatched_reads
                                         index1_loop = 0
                                         break
-                                elif index2_loop == len(index2_sequence):  # If index 1 is same/similar and index 2 isn't
+                                elif index2_loop == len(
+                                        index2_sequence):  # If index 1 is same/similar and index 2 isn't
                                     # Loop through all the index 2s first before adding the number with no match
                                     if barcode not in not_similar_mismatch_index_dict:
                                         not_similar_mismatch_index_dict[barcode] = number_of_mismatched_reads
@@ -417,7 +430,7 @@ def import_file(jsonFile):
     :return flowcell ID, number of lanes used, list of sample names, number of samples,
     path to ConversionResults and UnknownBarcodes:
     """
-    open_json = json.load(jsonFile) # move this to the main and added it to a variable to pass along the function
+    open_json = json.load(jsonFile)  # move this to the main and added it to a variable to pass along the function
     flow_cell_id = open_json["Flowcell"]
     run_dir_base = open_json["RunId"]
     conversion_results = open_json["ConversionResults"]
@@ -486,6 +499,3 @@ def parse_sample_sheet(sample_sheet_path):
 if __name__ == "__main__":
     main()
 
-
-class MissingSequence1Exception(Exception):
-    pass
