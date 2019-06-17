@@ -2,10 +2,12 @@ from ParseJson import *
 
 from unittest import TestCase
 
+import os
+current_directory = os.getcwd()
 
 class Test_parse_sample_sheet(TestCase):
     def setUp(self):
-        self.test_sample_sheet_path = "/Users/m006703/IndexHopMetric/files/TestSampleSheet.csv"
+        self.test_sample_sheet_path = current_directory + "/test_files/TestSampleSheet.csv"
         self.expected_sample_sheet_info = {
             '17-ATZ02': {'Sample_Project': 'TEST-MSTR_TESTBATCH1_TESTCHEMID_TESTSEQID_TESTFLOWCELLID',
                          'Batch_ID': 'TESTBATCH1'},
@@ -21,7 +23,7 @@ class Test_parse_sample_sheet(TestCase):
 
 class Test_import_file(TestCase):
     def setUp(self):
-        self.test_json_file = open("/Users/m006703/IndexHopMetric/files/Test_Stats.json", 'r')
+        self.test_json_file = open(current_directory + "/test_files/Test_Stats.json", 'r')
         self.expected_flowcell_id = "TEST-FLOWCELL"
         self.expected_run_dir_base = "TEST_RUN_DIR_BASE"
         self.expected_conversion_results = [
