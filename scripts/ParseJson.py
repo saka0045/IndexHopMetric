@@ -5,18 +5,7 @@ import argparse
 import sys
 import os
 from datetime import date
-
-
-class SampleNotFoundException(Exception):
-    pass
-
-
-class MissingSequence1Exception(Exception):
-    pass
-
-
-class SampleNumberMismatchException(Exception):
-    pass
+from ErrorLib import *
 
 
 def main():
