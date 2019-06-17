@@ -4,6 +4,8 @@ import json
 import argparse
 import sys
 import os
+from datetime import date
+from ErrorLib import *
 
 
 def main():
@@ -16,11 +18,20 @@ def main():
         '-o', '--outPath', dest='outPath', required=True,
         help='Output path for result file'
     )
+    parser.add_argument(
+        '-s', '--sampleSheet', dest='sample_sheet', required=True,
+        help="Path to sample sheet"
+    )
+    parser.add_argument(
+        '-r', '--report', action="store_true",
+        help="Creates .txt report if argument is present"
+    )
 
     args = parser.parse_args()
 
     input_file = os.path.abspath(args.inputFile)
     out_path = os.path.abspath(args.outPath)
+    sample_sheet_path = os.path.abspath(args.sample_sheet)
 
     # Add / at the end if it is not included in the output path
     if out_path.endswith("/"):
@@ -30,9 +41,19 @@ def main():
 
     json_file = open(input_file, 'r')
 
+    # Gather information from Sample Sheet
+
+    sample_sheet_info = parse_sample_sheet(sample_sheet_path)
+
     # Convert the json file to a python dictionary
 
-    flow_cell_id, conversion_results, num_of_lanes, num_of_samples, unknown_barcodes, sample_list = import_file(json_file)
+    flow_cell_id, run_dir_base, conversion_results, num_of_lanes, num_of_samples, \
+    unknown_barcodes, sample_list = import_file(json_file)
+
+    # Validate the sample name from sample list to Stats.json
+
+    validate_samples(sample_list, sample_sheet_info)
+
     print(flow_cell_id)
     print(sample_list)
     print("Number of lanes on this flowcell is " + str(num_of_lanes))
@@ -48,7 +69,7 @@ def main():
     index1_sequence, index2_sequence, mismatch_index_sequences = make_all_possible_index_combinations(index_sequence)
     print(index1_sequence)
     print(index2_sequence)
-    print(mismatch_index_sequences)
+    # print(mismatch_index_sequences)
     print("Number of mismatched index combinations is " + str(len(mismatch_index_sequences)))
 
     # Calculate the total number of reads for all samples
@@ -57,22 +78,25 @@ def main():
 
     # Make dictionaries of mismatched reads
 
-    mismatch_index_dict, similar_mismatch_index_dict, not_similar_mismatch_index_dict = mismatched_reads(index1_sequence,
-                                                                        index2_sequence, mismatch_index_sequences,
-                                                                                    num_of_lanes, unknown_barcodes)
+    mismatch_index_dict, similar_mismatch_index_dict, not_similar_mismatch_index_dict = mismatched_reads(
+        index1_sequence,
+        index2_sequence, mismatch_index_sequences,
+        num_of_lanes, unknown_barcodes)
 
     # Calculate the index hopping percent
 
     index_hop_percent, total_number_of_mismatched_reads = index_hopping_percent(mismatch_index_dict,
-                                                                          similar_mismatch_index_dict,
-                                                                          total_number_of_reads)
+                                                                                similar_mismatch_index_dict,
+                                                                                total_number_of_reads)
 
+    '''
     print("Mismatch Index Dict")
     print(mismatch_index_dict)
     print("Similar mismatched Index Dict")
     print(similar_mismatch_index_dict)
     print("Not similar mismatched index dict")
     print(not_similar_mismatch_index_dict)
+    '''
     print("The total number of mismatched reads is " + str(total_number_of_mismatched_reads))
     print("The total number of identified reads is " + str(total_number_of_reads))
     print("Index Hopping Percent is " + str(round(index_hop_percent, 2)) + "%")
@@ -80,7 +104,8 @@ def main():
     # Calculate how many times each index pair jumped and store it in a dictionary
 
     index_jump_dict = index_jump_count(index1_sequence, index2_sequence, index_sequence, mismatch_index_dict,
-                                     similar_mismatch_index_dict)
+                                       similar_mismatch_index_dict)
+    # print(index_jump_dict)
 
     # Group all of the not similar indexes to the valid sample index1+index2 combination
 
@@ -88,39 +113,70 @@ def main():
                                                                                         index2_sequence, index_sequence,
                                                                                         not_similar_mismatch_index_dict)
 
-    print("Not similar index association dictionary")
-    print(not_similar_index_association)
+    # print("Not similar index association dictionary")
+    # print(not_similar_index_association)
 
-    # Make result file
+    # Make RoQCM TSV files
 
-    result_file = open(out_path + flow_cell_id + "_Results.txt", 'w')
+    today = date.today().strftime('%Y%m%d')
 
-    result_file.write("Number of mismatched reads\t" + str(total_number_of_mismatched_reads) + "\n")
-    result_file.write("Number of identified reads\t" + str(total_number_of_reads) + "\n")
-    result_file.write("Index Hopping Percent\t" + str(index_hop_percent) + "%\n\n")
-    result_file.write("Sample\tIndex\tIndex Jump Count\n")
+    index_hopping_tsv = open(out_path + run_dir_base + "-index-hopping-" + today + ".metrictsv", 'w')
+    index_hopping_tsv.write("index_hopping\trun.index.hopping.percent\tD\t" + str(index_hop_percent) + "\t"
+                            + run_dir_base + "\trun\n")
 
+    index_jump_count_tsv = open(out_path + run_dir_base + "-index-jump-count-" + today + ".metric.tsv", 'w')
     for (key, val) in index_jump_dict.items():
         sample_list_index = index_sequence.index(key)
-        result_file.write(sample_list[sample_list_index] + "\t" + key + "\t" + str(val) + "\n")
+        sample_id = sample_list[sample_list_index]
+        batch_id = sample_sheet_info[sample_id]["Batch_ID"]
+        index_jump_count_tsv.write("index_hopping\tsample.index.jump.count\tI\t" + str(val) + "\t" + sample_id +
+                                   "\tsample\t" + batch_id + "\tbatch\t" + run_dir_base + "\trun\n")
 
-    # Make non similar mismatch index result file
+    index_hopping_tsv.close()
+    index_jump_count_tsv.close()
 
-    not_similar_mismatch_index_result_file = open(out_path + flow_cell_id + "_NonSimilarIndex.txt", 'w')
-    not_similar_mismatch_index_result_file.write("Sample\tMismatch Index\tMismatch Read Count\t" +
-                                                 "Total Mismatch Reads for Sample\n")
+    # Make result file if -r argument is present
 
-    for (key, val) in not_similar_index_association.items():
-        sample_list_index = index_sequence.index(key)
-        not_similar_mismatch_index_result_file.write(sample_list[sample_list_index] + ": " + key + "\t\t\t"
-                                                     + str(not_similar_jump_count_dict[key]) + "\n")
-        for (item, number) in val.items():
-            not_similar_mismatch_index_result_file.write("\t" + item + "\t" + str(number) + "\n")
-        not_similar_mismatch_index_result_file.write("\n")
+    if args.report:
+        result_file = open(out_path + flow_cell_id + "_Results.txt", 'w')
+
+        result_file.write("Number of mismatched reads\t" + str(total_number_of_mismatched_reads) + "\n")
+        result_file.write("Number of identified reads\t" + str(total_number_of_reads) + "\n")
+        result_file.write("Index Hopping Percent\t" + str(index_hop_percent) + "%\n\n")
+        result_file.write("Sample\tIndex\tIndex Jump Count\n")
+
+        for (key, val) in index_jump_dict.items():
+            sample_list_index = index_sequence.index(key)
+            result_file.write(sample_list[sample_list_index] + "\t" + key + "\t" + str(val) + "\n")
+
+        # Make non similar mismatch index result file
+
+        not_similar_mismatch_index_result_file = open(out_path + flow_cell_id + "_NonSimilarIndex.txt", 'w')
+        not_similar_mismatch_index_result_file.write("Sample\tMismatch Index\tMismatch Read Count\t" +
+                                                     "Total Mismatch Reads for Sample\n")
+
+        for (key, val) in not_similar_index_association.items():
+            sample_list_index = index_sequence.index(key)
+            not_similar_mismatch_index_result_file.write(sample_list[sample_list_index] + ": " + key + "\t\t\t"
+                                                         + str(not_similar_jump_count_dict[key]) + "\n")
+            for (item, number) in val.items():
+                not_similar_mismatch_index_result_file.write("\t" + item + "\t" + str(number) + "\n")
+            not_similar_mismatch_index_result_file.write("\n")
+
+        result_file.close()
+        not_similar_mismatch_index_result_file.close()
 
     json_file.close()
-    result_file.close()
-    not_similar_mismatch_index_result_file.close()
+
+
+def validate_samples(sample_list, sample_sheet_info):
+    for sample_id in sample_sheet_info:
+        if len(sample_sheet_info) != len(sample_list):
+            raise SampleNumberMismatchException("Number of samples between Sample Sheet and Stats.json does not match! "
+                                                "Check to see if the right Sample Sheet was provided")
+        if sample_id not in sample_list:
+            raise SampleNotFoundException(sample_id + " is not found in Stats.json! Check to see if the right Sample "
+                                                      "Sheet was provided")
 
 
 def not_similar_jump_count(index1_sequence, index2_sequence, index_sequence, not_similar_mismatch_index_dict):
@@ -264,7 +320,8 @@ def mismatched_reads(index1_sequence, index2_sequence, mismatch_index_sequences,
                             index2_loop += 1
                             similarity_score2 = compare_sequences(index2, unknown_index2)
                             # Avoid counting a valid index1-index2 combination that is off by 1 base
-                            if similarity_score2 <= 1 and index1_sequence.index(index1) == index2_sequence.index(index2):
+                            if similarity_score2 <= 1 and index1_sequence.index(index1) == index2_sequence.index(
+                                    index2):
                                 index1_loop = 0
                                 break
                             elif (index1_sequence.index(index1) != index2_sequence.index(index2)):
@@ -281,7 +338,8 @@ def mismatched_reads(index1_sequence, index2_sequence, mismatch_index_sequences,
                                         similar_mismatch_index_dict[barcode] += number_of_mismatched_reads
                                         index1_loop = 0
                                         break
-                                elif index2_loop == len(index2_sequence):  # If index 1 is same/similar and index 2 isn't
+                                elif index2_loop == len(
+                                        index2_sequence):  # If index 1 is same/similar and index 2 isn't
                                     # Loop through all the index 2s first before adding the number with no match
                                     if barcode not in not_similar_mismatch_index_dict:
                                         not_similar_mismatch_index_dict[barcode] = number_of_mismatched_reads
@@ -361,8 +419,9 @@ def import_file(jsonFile):
     :return flowcell ID, number of lanes used, list of sample names, number of samples,
     path to ConversionResults and UnknownBarcodes:
     """
-    open_json = json.load(jsonFile) # move this to the main and added it to a variable to pass along the function
+    open_json = json.load(jsonFile)  # move this to the main and added it to a variable to pass along the function
     flow_cell_id = open_json["Flowcell"]
+    run_dir_base = open_json["RunId"]
     conversion_results = open_json["ConversionResults"]
     unknown_barcodes = open_json["UnknownBarcodes"]
     # Calculate the number of lanes on the flowcell
@@ -373,7 +432,7 @@ def import_file(jsonFile):
         sample_list.append(conversion_results[0]["DemuxResults"][sample]["SampleId"])
     # Number of samples on this flowcell
     num_of_samples = len(conversion_results[0]["DemuxResults"])
-    return flow_cell_id, conversion_results, num_of_lanes, num_of_samples, unknown_barcodes, sample_list
+    return flow_cell_id, run_dir_base, conversion_results, num_of_lanes, num_of_samples, unknown_barcodes, sample_list
 
 
 def compare_sequences(sequence1, sequence2):
@@ -395,9 +454,37 @@ def compare_sequences(sequence1, sequence2):
         return
 
 
+def parse_sample_sheet(sample_sheet_path):
+    """
+    Opens the supplied sample sheet and parses out information into a dictionary
+    :param sample_sheet_path:
+    :return Dictionary containing information from sample sheet:
+    """
+    sample_sheet = open(sample_sheet_path, 'r')
+    sample_sheet_info = {}
+    for line in sample_sheet:
+        # Go to the line with [Data]
+        if line.startswith("[Data]"):
+            # Skip to the header line
+            line = sample_sheet.readline()
+            line = line.rstrip()
+            header_list = line.split(",")
+            for line in sample_sheet:
+                sample_info = {}
+                line = line.rstrip()
+                line_item_list = line.split(",")
+                sample_id = line_item_list[header_list.index("SAMPLE_ID")]
+                sample_project = line_item_list[header_list.index("SAMPLE_PROJECT")]
+                batch_id = sample_project.split("_")[1]
+                sample_info["Sample_Project"] = sample_project
+                sample_info["Batch_ID"] = batch_id
+                if sample_id not in sample_sheet_info.keys():
+                    sample_sheet_info[sample_id] = sample_info
+            break
+    sample_sheet.close()
+    return sample_sheet_info
+
+
 if __name__ == "__main__":
     main()
 
-
-class MissingSequence1Exception(Exception):
-    pass

@@ -4,3 +4,4 @@ files/*
 lib/*
 pyvenv.cfg
 biopython_test.py
+__pycache__/*
