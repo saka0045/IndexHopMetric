@@ -8,3 +8,11 @@ class MissingSequence1Exception(Exception):
 
 class SampleNumberMismatchException(Exception):
     pass
+
+
+class NoDualIndexException(Exception):
+    pass
+
+
+class NotUniqueDualIndexException(Exception):
+    pass

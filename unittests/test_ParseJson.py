@@ -1,11 +1,14 @@
-from ParseJson import *
+from IndexHoppingLib import *
+from ErrorLib import *
 
 from unittest import TestCase
 
+import os
+current_directory = os.getcwd()
 
 class Test_parse_sample_sheet(TestCase):
     def setUp(self):
-        self.test_sample_sheet_path = "/Users/m006703/IndexHopMetric/files/TestSampleSheet.csv"
+        self.test_sample_sheet_path = current_directory + "/test_files/TestSampleSheet.csv"
         self.expected_sample_sheet_info = {
             '17-ATZ02': {'Sample_Project': 'TEST-MSTR_TESTBATCH1_TESTCHEMID_TESTSEQID_TESTFLOWCELLID',
                          'Batch_ID': 'TESTBATCH1'},
@@ -21,7 +24,7 @@ class Test_parse_sample_sheet(TestCase):
 
 class Test_import_file(TestCase):
     def setUp(self):
-        self.test_json_file = open("/Users/m006703/IndexHopMetric/files/Test_Stats.json", 'r')
+        self.test_json_file = open(current_directory + "/test_files/Test_Stats.json", 'r')
         self.expected_flowcell_id = "TEST-FLOWCELL"
         self.expected_run_dir_base = "TEST_RUN_DIR_BASE"
         self.expected_conversion_results = [
@@ -79,6 +82,7 @@ class Test_import_file(TestCase):
     def test_import_file_happy(self):
         flowcell_id, run_dir_base, conversion_results, num_of_lanes, num_of_samples, unknown_barcodes, sample_list = import_file(
             self.test_json_file)
+        self.test_json_file.close()
         self.assertEqual(self.expected_flowcell_id, flowcell_id, "failed flowcell_id")
         self.assertEqual(self.expected_run_dir_base, run_dir_base, "failed run_dir_base")
         self.assertEqual(self.expected_conversion_results, conversion_results, "failed conversion_results")
@@ -131,16 +135,62 @@ class Test_capture_index_sequence(TestCase):
              'Undetermined': {'NumberReads': 69538, 'Yield': 347690, 'ReadMetrics': [
                  {'ReadNumber': 1, 'Yield': 347690, 'YieldQ30': 297761, 'QualityScoreSum': 11203807,
                   'TrimmedBases': 0}]}}]
+        self.conversion_results_no_dual_index = [
+            {'LaneNumber': 1, 'TotalClustersRaw': 610406, 'TotalClustersPF': 593007, 'Yield': 2965035, 'DemuxResults':
+                [{'SampleId': '17-ATZ02', 'SampleName': '17-ATZ02', 'IndexMetrics':
+                    [{'IndexSequence': 'AAAA+BBBB', 'MismatchCounts': {'0': 62916, '1': 1909}}],
+                  'NumberReads': 1000, 'Yield': 324125,
+                  'ReadMetrics': [{'ReadNumber': 1, 'Yield': 324125, 'YieldQ30': 305523, 'QualityScoreSum': 10740551,
+                                   'TrimmedBases': 0}]},
+                 {'SampleId': '18-BNHL2', 'SampleName': '18-BNHL2',
+                  'IndexMetrics': [{'IndexSequence': 'CCCC', 'MismatchCounts': {'0': 68117, '1': 1994}}],
+                  'NumberReads': 1000, 'Yield': 350555,
+                  'ReadMetrics': [{'ReadNumber': 1, 'Yield': 350555, 'YieldQ30': 327403, 'QualityScoreSum': 11717334,
+                                   'TrimmedBases': 0}]}, {'SampleId': '18-BNHL9', 'SampleName': '18-BNHL9',
+                                                          'IndexMetrics': [{'IndexSequence': 'EEEE+FFFF',
+                                                                            'MismatchCounts': {'0': 1000, '1': 1865}}],
+                                                          'NumberReads': 1000, 'Yield': 234965,
+                                                          'ReadMetrics': [
+                                                              {'ReadNumber': 1, 'Yield': 234965, 'YieldQ30': 207596,
+                                                               'QualityScoreSum': 7638772, 'TrimmedBases': 0}]}],
+             'Undetermined': {'NumberReads': 69538, 'Yield': 347690,
+                              'ReadMetrics': [
+                                  {'ReadNumber': 1, 'Yield': 347690, 'YieldQ30': 297761, 'QualityScoreSum': 11203807,
+                                   'TrimmedBases': 0}]}},
+            {'LaneNumber': 2, 'TotalClustersRaw': 610406, 'TotalClustersPF': 593007, 'Yield': 2965035, 'DemuxResults':
+                [{'SampleId': '17-ATZ02', 'SampleName': '17-ATZ02', 'IndexMetrics':
+                    [{'IndexSequence': 'AAAA+BBBB', 'MismatchCounts': {'0': 62916, '1': 1909}}],
+                  'NumberReads': 1000, 'Yield': 324125, 'ReadMetrics':
+                      [{'ReadNumber': 1, 'Yield': 324125, 'YieldQ30': 305523, 'QualityScoreSum': 10740551,
+                        'TrimmedBases': 0}]},
+                 {'SampleId': '18-BNHL2', 'SampleName': '18-BNHL2',
+                  'IndexMetrics': [{'IndexSequence': 'CCCC', 'MismatchCounts':
+                      {'0': 68117, '1': 1994}}], 'NumberReads': 1000, 'Yield': 350555, 'ReadMetrics':
+                      [{'ReadNumber': 1, 'Yield': 350555, 'YieldQ30': 327403, 'QualityScoreSum': 11717334,
+                        'TrimmedBases': 0}]},
+                 {'SampleId': '18-BNHL9', 'SampleName': '18-BNHL9',
+                  'IndexMetrics': [{'IndexSequence': 'EEEE+FFFF', 'MismatchCounts': {'0': 1000, '1': 1865}}],
+                  'NumberReads': 1000, 'Yield': 234965, 'ReadMetrics': [
+                     {'ReadNumber': 1, 'Yield': 234965, 'YieldQ30': 207596, 'QualityScoreSum': 7638772,
+                      'TrimmedBases': 0}]}],
+             'Undetermined': {'NumberReads': 69538, 'Yield': 347690, 'ReadMetrics': [
+                 {'ReadNumber': 1, 'Yield': 347690, 'YieldQ30': 297761, 'QualityScoreSum': 11203807,
+                  'TrimmedBases': 0}]}}]
         self.expected_index_sequence = ['AAAA+BBBB', 'CCCC+DDDD', 'EEEE+FFFF']
 
     def test_capture_index_sequence_happy(self):
         index_sequence = capture_index_sequence(self.conversion_results)
         self.assertEqual(self.expected_index_sequence, index_sequence, "failed index_sequence")
+    def test_capture_index_sequence_no_dual_index(self):
+        with self.assertRaises(NoDualIndexException):
+            capture_index_sequence(self.conversion_results_no_dual_index)
 
 
 class Test_make_all_possible_index_combinations(TestCase):
     def setUp(self):
         self.index_sequence = ['AAAA+BBBB', 'CCCC+DDDD', 'EEEE+FFFF']
+        self.index_sequence_not_unique1 = ['AAAA+BBBB', 'AAAA+DDDD', 'EEEE+FFFF']
+        self.index_sequence_not_unique2 = ['AAAA+BBBB', 'CCCC+DDDD', 'EEEE+BBBB']
         self.expected_index1_sequence = ['AAAA', 'CCCC', 'EEEE']
         self.expected_index2_sequence = ['BBBB', 'DDDD', 'FFFF']
         self.expected_mismatch_index_sequence = ['AAAA+DDDD', 'AAAA+FFFF', 'CCCC+BBBB', 'CCCC+FFFF', 'EEEE+BBBB',
@@ -156,6 +206,13 @@ class Test_make_all_possible_index_combinations(TestCase):
         self.assertEqual(self.expected_mismatch_index_sequence, mismatch_index_sequence, "failed make_all_possible_"
                                                                                          "index_combination: mismatch_index_sequence")
 
+    def test_make_all_possible_index_combinations_not_unique1(self):
+        with self.assertRaises(NotUniqueDualIndexException):
+            make_all_possible_index_combinations(self.index_sequence_not_unique1)
+
+    def test_make_all_possible_index_combinations_not_unique2(self):
+        with self.assertRaises(NotUniqueDualIndexException):
+            make_all_possible_index_combinations(self.index_sequence_not_unique2)
 
 class Test_compare_sequences(TestCase):
     def setUp(self):
